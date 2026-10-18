@@ -1,6 +1,8 @@
 # Sync giao diện v2 (xương) + palette v1 (xanh lá): phần Backend
 
-> **Cho người làm tiếp:** làm lần lượt từng task, tick `- [ ]` khi xong, ghi commit hash vào cột "Trạng thái" ở bảng đầu file. Mỗi task độc lập đủ để merge riêng, nên có thể dừng giữa chừng. Đọc kèm bản FE: `grocery-store-frontend/docs/plans/2026-10-18-sync-ui-v2-frontend.md` (hai file chung các mục 1, 2, 3, 4).
+> **Phạm vi (cập nhật theo issue #11):** issue #11 chỉ yêu cầu **vỏ giao diện**, storefront chạy bằng dữ liệu giả (`NEXT_PUBLIC_UI_MOCK=true`). Vì vậy **không task BE nào dưới đây chặn #11**. File này là **lộ trình giai đoạn 2**: làm sau khi #11 merge, khi nhóm đấu dữ liệu thật và tắt cờ mock. Bảng "Giữ chỗ → tính năng thật" ở mục 4 của file FE cho biết task BE nào thay khối giữ chỗ nào.
+>
+> **Cho người làm tiếp:** làm lần lượt từng task, tick `- [ ]` khi xong, ghi commit hash vào cột "Trạng thái" ở bảng đầu file. Mỗi task độc lập đủ để merge riêng, nên có thể dừng giữa chừng. Đọc kèm bản FE: `grocery-store-frontend/docs/plans/2026-10-18-sync-ui-v2-frontend.md`. Các mục 2, 3, 4 dưới đây là hợp đồng dữ liệu cho giai đoạn 2; FE chưa dùng đến trong #11, nhưng view-model của FE (`ProductVM`, `OrderVM`) được thiết kế để khớp.
 >
 > Quy ước backend (Medusa v2.21.1) ở `AGENTS.md` của repo này vẫn là ưu tiên: logic nằm trong workflow/module, route chỉ gọi workflow, không raw SQL, sửa model thì `medusa db:generate`. **Đừng đoán API Medusa từ trí nhớ**, tra docs (MCP `medusa`) trước khi viết mỗi task. Lệnh test: `cd apps/backend && npm run test:integration:http`.
 
@@ -24,7 +26,7 @@
 | BE-11 | Admin: Việt hóa, widget Tổng quan, widget Sắp cạn kho | P3 | BE-2 | [ ] |
 | BE-12 | Dọn dẹp, cập nhật `.env.template`, README | P3 | tất cả | [ ] |
 
-P0 = FE không chạy được nếu thiếu. P1 = luồng mua hàng đầy đủ. P2/P3 = có thể để sau, FE có fixture thay thế.
+Ưu tiên tính cho **giai đoạn 2**: P0 = FE không chạy được với dữ liệu thật nếu thiếu. P1 = luồng mua hàng đầy đủ. P2/P3 = có thể để sau, FE vẫn dùng khối giữ chỗ. Trong #11 không task nào bắt buộc.
 
 ## 1. Bối cảnh và những gì đã chốt
 
@@ -173,7 +175,7 @@ Mọi route `/store/*` cần `x-publishable-api-key`; route của khách cần t
 
 **Xong khi:** `GET /store/payment-providers?region_id=` chỉ trả **một** provider; áp mã `TUOI20` vào giỏ 395.000đ + phí giao 15.000đ cho tổng 390.000đ.
 
-- [ ] VNPAY thật là việc riêng (chưa có, xem `AGENTS.md` gốc). Ở task này dùng provider tạm `pp_system_default` làm "VNPAY thử nghiệm", để FE hiển thị nhãn **"Thanh toán qua VNPAY"**. Ghi rõ trong comment: thay bằng provider VNPAY khi module thanh toán xong. ID provider được dùng ở FE: xem FE-8.
+- [ ] VNPAY thật là việc riêng (chưa có, xem `AGENTS.md` gốc). Ở task này dùng provider tạm `pp_system_default` làm "VNPAY thử nghiệm", để FE hiển thị nhãn **"Thanh toán qua VNPAY"**. Ghi rõ trong comment: thay bằng provider VNPAY khi module thanh toán xong. ID provider được dùng ở FE: xem FE-9 (`paymentInfoMap` trong `src/lib/constants.tsx`).
 - [ ] Tắt Stripe/PayPal khỏi region (không đăng ký).
 - [ ] Promotion `TUOI20`: fixed 20.000 VND, áp trên đơn.
 - [ ] Test http: tổng giỏ mẫu = 390.000 (khớp `verify()` trong `shared.js`).
@@ -278,7 +280,8 @@ Mọi route `/store/*` cần `x-publishable-api-key`; route của khách cần t
 
 ## 5. Cách chia đôi công việc khi sync dở
 
-- **Đợt 1 (mở đường cho FE):** BE-1, BE-2, BE-3. Xong ba task này FE làm được catalog, trang chủ, danh sách, chi tiết, giỏ.
+- **Trước tiên:** merge #11 (FE chạy bằng dữ liệu giả). Sau đó mới bắt đầu các đợt dưới, mỗi đợt kết thúc bằng việc FE tắt mock cho phần tương ứng.
+- **Đợt 1 (mở đường cho FE):** BE-1, BE-2, BE-3. Xong ba task này FE đấu được catalog, trang chủ, danh sách, chi tiết, giỏ.
 - **Đợt 2 (luồng mua):** BE-4, BE-5, rồi BE-6, BE-7, BE-8. FE làm thanh toán, thành công, đơn hàng, theo dõi đơn.
 - **Đợt 3 (có thể sau):** BE-9, BE-10, BE-11, BE-12.
 - Khi dừng giữa chừng: ghi hash commit cuối vào bảng mục 0 và liệt kê ở đây điều chưa làm dở.
