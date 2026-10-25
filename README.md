@@ -157,7 +157,16 @@ The storefront is configured via environment variables in `apps/storefront/.env.
 `npm run seed --workspace=@dtc/backend` dựng khung cửa hàng Com4Fud: region "Việt Nam" (VND, quốc gia `vn`), kho "Kho Q.7", phương thức "Giao tận nhà" (15.000đ) và in publishable key cho storefront. Script idempotent: chạy lại không nhân đôi bản ghi và không xoá gì.
 
 Lưu ý:
-- Script **không dọn dữ liệu cũ**. Nếu DB dev còn dữ liệu Europe/quần áo từ bản seed cũ (`initial-data-seed.ts`, đã xoá), chạy `npx medusa db:reset` (trong `apps/backend`; xoá toàn bộ DB, kể cả user admin) rồi `npx medusa db:migrate`, tạo lại admin bằng `npx medusa user`, rồi seed.
+- Script **không dọn dữ liệu cũ**. Medusa 2.21.1 không có lệnh `db:reset`. Nếu DB dev còn dữ liệu Europe/quần áo từ bản seed cũ (`initial-data-seed.ts`, đã xoá), xoá và tạo lại DB (mất toàn bộ dữ liệu, kể cả user admin), rồi migrate, tạo admin và seed:
+  ```bash
+  # Postgres chạy trong Docker (tên container/DB theo máy bạn)
+  docker exec com4fud-postgres psql -U postgres -c 'DROP DATABASE "medusa-backend" WITH (FORCE)' -c 'CREATE DATABASE "medusa-backend"'
+  cd apps/backend
+  npx medusa db:migrate
+  npx medusa db:migrate:search
+  npx medusa user -e <email> -p <mật khẩu>
+  npm run seed --workspace=@dtc/backend   # chạy từ gốc repo
+  ```
 - Medusa tự tạo "Medusa Store", "Default Sales Channel" và một publishable key khi khởi động; seed dùng lại các thứ này (đặt tiền tệ mặc định VND) thay vì tạo trùng.
 
 ## Resources
