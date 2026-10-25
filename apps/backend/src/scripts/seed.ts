@@ -1,12 +1,16 @@
 import { ExecArgs } from "@medusajs/framework/types"
 import { bootstrapStore } from "../lib/seed/bootstrap-store"
+import { seedCatalog } from "../lib/seed/seed-catalog"
 
 // Chạy: npm run seed --workspace=@dtc/backend. Idempotent, chạy lại an toàn.
 export default async function seed({ container }: ExecArgs) {
-  const result = await bootstrapStore(container)
-  console.log("Region:", result.regionId)
-  console.log("Sales channel:", result.salesChannelId)
-  console.log("Stock location:", result.stockLocationId)
-  console.log("Shipping option:", result.shippingOptionId)
-  console.log("Publishable key:", result.publishableKey)
+  const store = await bootstrapStore(container)
+  console.log("Region:", store.regionId)
+  console.log("Sales channel:", store.salesChannelId)
+  console.log("Stock location:", store.stockLocationId)
+  console.log("Shipping option:", store.shippingOptionId)
+  console.log("Publishable key:", store.publishableKey)
+
+  const catalog = await seedCatalog(container, store)
+  console.log(`Catalog: created ${catalog.created}, skipped ${catalog.skipped}`)
 }
