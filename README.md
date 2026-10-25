@@ -152,6 +152,14 @@ The storefront is configured via environment variables in `apps/storefront/.env.
 | `NEXT_PUBLIC_BASE_URL` | Base URL of the storefront | `https://localhost:8000` |
 | `NEXT_PUBLIC_STRIPE_KEY` | Stripe publishable key (optional) | — |
 
+## Seed
+
+`npm run seed --workspace=@dtc/backend` dựng khung cửa hàng Com4Fud: region "Việt Nam" (VND, quốc gia `vn`), kho "Kho Q.7", phương thức "Giao tận nhà" (15.000đ) và in publishable key cho storefront. Script idempotent: chạy lại không nhân đôi bản ghi và không xoá gì.
+
+Lưu ý:
+- Script **không dọn dữ liệu cũ**. Nếu DB dev còn dữ liệu Europe/quần áo từ bản seed cũ (`initial-data-seed.ts`, đã xoá), chạy `npx medusa db:reset` (trong `apps/backend`; xoá toàn bộ DB, kể cả user admin) rồi `npx medusa db:migrate`, tạo lại admin bằng `npx medusa user`, rồi seed.
+- Medusa tự tạo "Medusa Store", "Default Sales Channel" và một publishable key khi khởi động; seed dùng lại các thứ này (đặt tiền tệ mặc định VND) thay vì tạo trùng.
+
 ## Resources
 
 - [Medusa Documentation](https://docs.medusajs.com)
