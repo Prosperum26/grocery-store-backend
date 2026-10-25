@@ -39,6 +39,8 @@ Sort theo trường chưa có trong index bị 400 `Unknown field "min_price_vnd
 
 **Quyết định:** dùng phương án dự phòng `allowFields` (BE-3a) cho `categories.id/handle/name` và `metadata` của đơn. Phần `variants.metadata` trong test BE-3a (a) sẽ **không FAIL ở bước đỏ** (đã pass sẵn); chỉ `categories.handle` và `metadata` của đơn là đỏ. Cách khác không cần `allowFields`: storefront dùng `fields=*categories`.
 
+**Xác nhận ở BE-3a:** `allowFields` trong middleware toàn cục (không có `method`) cho `/store/products*` (`variants.metadata`, `categories.id/handle/name`) và `/store/orders/:id` (`metadata`) làm `integration-tests/http/store-fields.spec.ts` từ đỏ sang xanh. Đỏ trước khi sửa: `categories[0].handle` và `order.metadata` đều `undefined`. `allowFields` chỉ `req.allowed.push(...fields)` (`framework/dist/http/middlewares/allow-fields-middleware.js`). Rủi ro: `GET /store/orders/:id` không xác thực, ai có UUID đơn đều đọc được `metadata`.
+
 ## S3 — Tra order từ fulfillment id / payment id
 
 **Kết quả:** hai cách đều chạy với `query.graph`:
