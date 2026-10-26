@@ -161,3 +161,18 @@ Cho đơn tạo bằng `completeCart`: `query.graph({ entity: "order_cart", fiel
 - `seedPromotions` chạy trong `npm run seed` (cần `VNPAY_TMN_CODE`/`VNPAY_HASH_SECRET` trong `.env`, xem BE-5a).
 
 **Bằng chứng:** `src/lib/vouchers/__tests__/classify.unit.spec.ts` (11 test), `integration-tests/http/vouchers.spec.ts` (8 test).
+
+## BE-6 — Stage đơn hàng theo sự kiện
+
+**Kết quả đã chạy thật:**
+- **Tra đơn từ fulfillment (S3) dùng đúng như đã ghi:** `query.graph({ entity: "fulfillment", fields: ["id","order.id"], filters: { id } })` trong `resolveOrderId.fromFulfillment`; test chuỗi `shipment.created` → SHIPPING và `delivery.created` → DELIVERED đi qua nó (không cần dự phòng).
+- **Hằng số event:** `OrderWorkflowEvents.{PLACED,FULFILLMENT_CREATED,CANCELED}` và `FulfillmentWorkflowEvents.{SHIPMENT_CREATED,DELIVERY_CREATED}` (`utils/dist/core-flows/events.js`). Payload: `order.placed {id}`, `order.fulfillment_created {order_id, fulfillment_id}`, `shipment.created {id: fulfillment id}`, `delivery.created {id: fulfillment id}`, `order.canceled {id}`.
+- **Đơn dựng bằng giỏ (`completeCartWorkflow`) đã đủ cho cả chuỗi fulfillment:** có shipping method và reservation nên `createOrderFulfillmentWorkflow` chạy được, và `order.placed` được phát thật. Đơn `createOrderWorkflow` không có hai thứ đó (`create-fulfillment.js` yêu cầu reservation cho biến thể `manage_inventory`) và không phát `order.placed`. Region chỉ còn VNPAY (BE-5a) nên test thêm `pp_system_default` vào region để hoàn tất giỏ.
+- **Tạo admin trong test/script (S7 còn thiếu):** `createUsersWorkflow` **không** nhận `authIdentityId`. Làm đúng như `medusa user` (`medusa/dist/commands/user.js`): `createUsersWorkflow({ users: [{ email }] })` → `authService.register("emailpass", { body })` → `authService.updateAuthIdentities({ id, app_metadata: { user_id } })` → `POST /auth/user/emailpass` lấy token. RBAC (role super admin) chỉ gán khi bật feature flag `rbac`, mặc định tắt. Helper: `integration-tests/http/_admin.ts`.
+- **Ghi stage:** `updateOrdersStep({ selector: { id }, update: { metadata } })` ghi thẳng order module và không phát `order.updated`; workflow tự trộn `{ ...metadata cũ, stage, stage_log }`. Khoá theo đơn bằng `acquireLockStep` / `releaseLockStep` (`timeout` tính bằng giây; compensation của bước acquire nhả khoá khi workflow lỗi) để hai event sát nhau không ghi đè `stage_log` của nhau.
+- **Event lặp hoặc lệch thứ tự** bị từ chối bằng `INVALID_DATA` (chuyển về chính nó cũng không hợp lệ) và subscriber chỉ `logger.warn`. Test đếm cảnh báo để chứng minh subscriber đã chạy, không chỉ "stage_log không đổi".
+- **Đơn cũ bị huỷ khi chưa có stage** (ví dụ tạo bằng `createOrderWorkflow` rồi `cancelOrderWorkflow`) vẫn **không có stage**: `undefined` chỉ được vào PENDING nên `order.canceled` bị từ chối. Script backfill suy ra `CANCELLED` từ `status === "canceled"` cho các đơn này.
+- **Route confirm:** `POST /admin/orders/:id/confirm` trả 200; đơn không ở PENDING → 400 (`INVALID_DATA`), đơn lạ → 404, chưa đăng nhập → 401 (core xác thực `/admin/*`).
+- **Backfill:** `npx medusa exec ./src/scripts/backfill-order-stage.ts` (logic ở `backfillOrderStages`); chỉ đụng đơn chưa có `metadata.stage`, ghi `stage_log: [{ stage, at, by: "backfill" }]`, dùng `Modules.ORDER` `updateOrders(id, { metadata })`.
+
+**Bằng chứng:** `src/lib/order-stage/__tests__/stages.unit.spec.ts` (7 test, gồm ma trận 7×6), `integration-tests/http/order-stage.spec.ts` (5 test).
