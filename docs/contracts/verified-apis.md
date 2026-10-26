@@ -147,3 +147,17 @@ Cho đơn tạo bằng `completeCart`: `query.graph({ entity: "order_cart", fiel
 **Chưa kiểm (cần bước thủ công):** chuỗi ký dạng mã hoá URL (`%20` → `+`) có được cổng sandbox VNPAY chấp nhận không, và IPN thật qua tunnel HTTPS. Nếu sandbox báo sai chữ ký, đổi `buildSignData` sang không mã hoá, sửa `signature.unit.spec.ts` và ghi kết quả vào mục này. Lưu ý: PHP `urlencode` còn mã hoá `!'()*~` trong khi `encodeURIComponent` thì không.
 
 **Bằng chứng:** `src/modules/vnpay/__tests__/*.unit.spec.ts` (42 test), `integration-tests/http/vnpay-ipn.spec.ts` (11 test), `bootstrap-store.spec.ts`.
+
+## BE-5b — Mã giảm giá và ví mã
+
+**Kết quả đã chạy thật:**
+- **`starts_at` / `ends_at` nằm ở campaign, không ở promotion** (`promotion/dist/models/campaign.js`; promotion chỉ có `campaign_id`). `HETHAN5` tạo kèm `campaign { name, campaign_identifier, starts_at, ends_at }` có `ends_at` trong quá khứ; ví mã đọc `campaign.ends_at` qua `query.graph`.
+- **Rule của promotion** (`rules[] = { attribute, operator, values: string[] }`; giá trị là chuỗi): Medusa đánh giá rule trên đối tượng giỏ, nên `item_subtotal gte "150000"` và `customer.groups.id eq <groupId>` đều chạy thật. Đã kiểm: giỏ 160.000 + `TUOI20` → `discount_total 20000`; giỏ 64.000 → `0`; `THANHVIEN15` → `0` với khách thường, `15000` sau khi khách vào nhóm.
+- **Mã chưa đủ điều kiện KHÔNG bị từ chối.** `POST /store/carts/:id/promotions { promo_codes: ["TUOI20"] }` với giỏ dưới 150.000 trả 200 và `discount_total` giữ 0; chỉ mã không tồn tại (`KHONGCO`) trả 4xx. **Storefront phải đọc lại `discount_total` (hoặc `promotions`) sau khi áp mã** để biết mã có hiệu lực, không dựa vào 4xx. "Mã không hợp lệ" chỉ hiện cho mã lạ.
+- **Input workflow:** `createPromotionsWorkflow` `{ promotionsData: CreatePromotionDTO[] }` (`application_method: { type: "fixed", target_type: "order", allocation: "across", value, currency_code: "vnd" }`); `createCustomerGroupsWorkflow` `{ customersData: [{ name }] }`; `linkCustomersToCustomerGroupWorkflow` `{ id: groupId, add: [customerId] }`.
+- **Auth:** core đã có `authenticate("customer", ["session","bearer"])` cho `/store/customers/me*` (`medusa/dist/api/store/customers/middlewares.js:55`); bỏ middleware riêng của ta thì chưa đăng nhập vẫn ra 401. Middleware tường minh trong `src/api/middlewares.ts` giữ lại theo plan (trùng lặp, vô hại).
+- **D3:** ví chỉ hiện mã công khai và mã nhóm mà khách thuộc; mã nhóm khác bị ẩn hẳn (không hiện dạng `not_eligible`). Muốn hiện thì bỏ bước lọc `isVisibleToCustomer` trong route.
+- Ví chưa nhận `cart_id`/`cart_subtotal`, nên mức tối thiểu của `TUOI20` không được xét ở ví (luôn `usable`); `classifyVoucher` đã hỗ trợ `cartSubtotal` khi cần.
+- `seedPromotions` chạy trong `npm run seed` (cần `VNPAY_TMN_CODE`/`VNPAY_HASH_SECRET` trong `.env`, xem BE-5a).
+
+**Bằng chứng:** `src/lib/vouchers/__tests__/classify.unit.spec.ts` (11 test), `integration-tests/http/vouchers.spec.ts` (8 test).
