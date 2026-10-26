@@ -1,5 +1,6 @@
 import {
   allowFields,
+  authenticate,
   configureStoreSearch,
   defineMiddlewares,
   validateAndTransformBody,
@@ -29,6 +30,12 @@ export default defineMiddlewares({
       method: ['POST'],
       matcher: '/store/carts/:id/delivery-slot',
       middlewares: [validateAndTransformBody(SetDeliverySlotBody)],
+    },
+    // Ví mã giảm giá: cần khách đã đăng nhập (session hoặc bearer token), nếu không thì 401.
+    {
+      method: ['GET'],
+      matcher: '/store/customers/me/vouchers',
+      middlewares: [authenticate('customer', ['session', 'bearer'])],
     },
     // Order retrieve omits `metadata` (the list route has it); needed for metadata.stage.
     // Risk: this route is unauthenticated, anyone holding the order UUID can read it.
