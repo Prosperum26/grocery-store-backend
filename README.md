@@ -169,6 +169,14 @@ Lưu ý:
   ```
 - Medusa tự tạo "Medusa Store", "Default Sales Channel" và một publishable key khi khởi động; seed dùng lại các thứ này (đặt tiền tệ mặc định VND) thay vì tạo trùng.
 
+## Thanh toán VNPAY (sandbox)
+
+Region "Việt Nam" chỉ có một phương thức thanh toán: VNPAY (`pp_vnpay_vnpay`, code ở `apps/backend/src/modules/vnpay`).
+
+- Điền `VNPAY_TMN_CODE` và `VNPAY_HASH_SECRET` (nhận qua email đăng ký sandbox.vnpayment.vn) vào `apps/backend/.env`; `VNPAY_PAY_URL`, `VNPAY_RETURN_URL` xem `.env.template`. **Thiếu hai biến đầu thì backend không khởi động** (provider kiểm tra options). Không commit `.env`.
+- **IPN** là `GET /hooks/vnpay/ipn` và cần một URL công khai HTTPS. Khi dev dùng tunnel (ví dụ cloudflared hoặc ngrok trỏ tới cổng 9000), rồi khai báo `https://<tunnel>/hooks/vnpay/ipn` trong cổng sandbox VNPAY (mục cấu hình IPN URL của merchant). Return URL chỉ để hiển thị, không đổi trạng thái đơn.
+- `npm run seed` cập nhật region đang có (DB cũ còn `pp_system_default`) sang chỉ còn VNPAY.
+
 ## Resources
 
 - [Medusa Documentation](https://docs.medusajs.com)

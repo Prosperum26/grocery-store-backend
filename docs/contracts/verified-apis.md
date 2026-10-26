@@ -129,3 +129,21 @@ Cho đơn tạo bằng `completeCart`: `query.graph({ entity: "order_cart", fiel
 
 **Bằng chứng:** `src/lib/delivery/__tests__/slots.unit.spec.ts` (7 test), `integration-tests/http/delivery-slots.spec.ts` (6 test).
 **Quyết định:** `GET /store/delivery-slots` cũng đi qua workflow `list-delivery-slots` (một step) để route nào cũng chỉ gọi workflow.
+
+## BE-5a — Provider VNPAY và IPN
+
+**Kết quả đã chạy thật (giá trị giả trong `.env.test`, chưa gọi cổng VNPAY thật):**
+- **`provider` trong event phải là `vnpay_vnpay`, không có `pp_`.** `PaymentModuleService.getWebhookActionAndData` tự ghép `pp_${provider}` (`payment/dist/services/payment-module.js` ~dòng 697). Test `provider trong event là vnpay_vnpay`: `vnpay_vnpay` → `captured`; `pp_vnpay_vnpay` bị từ chối. Trả lời mục S4 "chưa chạy với provider VNPAY thật".
+- **Id phiên tới provider qua `context.idempotency_key`** khi `initiatePayment` (`payment-module.js` ~dòng 238); `updatePayment` không có chắc chắn nên lấy lại từ `data.txn_ref`.
+- **Luồng `captured` khi chưa có payment** (`core-flows/dist/payment/workflows/process-payment.js`): `authorizePaymentSessionStep` → provider `authorizePayment` → tạo payment → `capturePaymentWorkflow` → (sau khi nhả khoá giỏ) `completeCartAfterPaymentStep`. Vì vậy payment được capture **trước**, đơn được tạo **sau** vài trăm ms: test phải chờ `order_cart`, không chỉ chờ payment.
+- **`authorizePayment` phải cổng theo dấu đã trả.** `complete` giỏ của storefront cũng gọi `authorizePayment`; nếu luôn trả `authorized` thì ai có id giỏ cũng lấy được đơn chưa trả tiền (đã chứng minh bằng đột biến: test `complete giỏ khi chưa thanh toán không tạo đơn` đỏ). Provider chỉ trả `authorized` khi `session.data.paid === true`; dấu này do route IPN ghi sau khi kiểm chữ ký, số tiền, rồi gọi `updatePaymentSession` (provider `updatePayment` giữ nguyên data khi đã `paid`).
+- **Mã trả lời IPN:** 97 sai chữ ký; 01 txn_ref lạ hoặc không có phiên VNPAY; 04 sai số tiền; 02 phiên đã có payment; 00 còn lại (kể cả giao dịch thất bại như ResponseCode 24: ghi nhận tin, không đổi gì); 99 lỗi bất ngờ. Luôn HTTP 200.
+- **IPN lặp / đồng thời:** gọi lại sau khi đã có payment → 02. Hai IPN đến cùng lúc → cả hai có thể trả 00 (đánh dấu paid rồi phát event) nhưng khoá giỏ của `processPaymentWorkflow` giữ kết quả: vẫn đúng một đơn, một payment (test đã chạy). Nếu event lần trước bị mất sau khi đánh dấu, lần gọi lại phát lại event thay vì kẹt giỏ.
+- **`txn_ref` chỉ chữ-số:** `("payses_01ABC", 2) ↔ "paysesU01ABCU2"` (chữ `U` hoa phân cách; ULID Crockford base32 không có `U`, prefix viết thường).
+- **Event:** `headers: {}` thay vì `req.headers` (không cần cho provider, tránh lưu header lạ vào hàng đợi); `delay: 0`.
+- **Region:** `bootstrapStore` giờ cập nhật region đang có sang chỉ `pp_vnpay_vnpay` (test + kiểm đột biến). `pp_system_default` vẫn đăng ký trong module nhưng không còn trong region.
+- Hậu quả: provider `validateOptions` ném lỗi khi thiếu `VNPAY_TMN_CODE`/`VNPAY_HASH_SECRET` nên mọi lệnh nạp app (`medusa develop`, `db:migrate`, `npm run seed`) cần hai biến này trong `.env`.
+
+**Chưa kiểm (cần bước thủ công):** chuỗi ký dạng mã hoá URL (`%20` → `+`) có được cổng sandbox VNPAY chấp nhận không, và IPN thật qua tunnel HTTPS. Nếu sandbox báo sai chữ ký, đổi `buildSignData` sang không mã hoá, sửa `signature.unit.spec.ts` và ghi kết quả vào mục này. Lưu ý: PHP `urlencode` còn mã hoá `!'()*~` trong khi `encodeURIComponent` thì không.
+
+**Bằng chứng:** `src/modules/vnpay/__tests__/*.unit.spec.ts` (42 test), `integration-tests/http/vnpay-ipn.spec.ts` (11 test), `bootstrap-store.spec.ts`.
