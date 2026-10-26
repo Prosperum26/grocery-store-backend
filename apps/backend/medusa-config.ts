@@ -12,5 +12,26 @@ module.exports = defineConfig({
       jwtSecret: process.env.JWT_SECRET,
       cookieSecret: process.env.COOKIE_SECRET,
     }
-  }
+  },
+  modules: [
+    {
+      // Provider id lưu trong DB là pp_{identifier}_{id} = pp_vnpay_vnpay.
+      resolve: '@medusajs/medusa/payment',
+      options: {
+        providers: [
+          {
+            resolve: './src/modules/vnpay',
+            id: 'vnpay',
+            options: {
+              tmnCode: process.env.VNPAY_TMN_CODE,
+              hashSecret: process.env.VNPAY_HASH_SECRET,
+              payUrl: process.env.VNPAY_PAY_URL || 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html',
+              returnUrl: process.env.VNPAY_RETURN_URL || 'http://localhost:8000/checkout/vnpay-return',
+              ipAddr: process.env.VNPAY_IP_ADDR || undefined,
+            },
+          },
+        ],
+      },
+    },
+  ],
 })

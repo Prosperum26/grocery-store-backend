@@ -10,6 +10,7 @@ import {
   createStoresWorkflow,
   linkSalesChannelsToApiKeyWorkflow,
   linkSalesChannelsToStockLocationWorkflow,
+  updateRegionsWorkflow,
   updateStoresWorkflow,
 } from "@medusajs/medusa/core-flows"
 
@@ -21,6 +22,8 @@ const FULFILLMENT_SET_NAME = "Kho Q.7 giao hàng"
 const SHIPPING_OPTION_NAME = "Giao tận nhà"
 // D5: phí giao cố định 15.000đ. VND là số nguyên đồng, không chia 100.
 const SHIPPING_FEE_VND = 15000
+// Chỉ thanh toán qua VNPAY: pp_{identifier}_{id} của provider đăng ký trong medusa-config.ts.
+const PAYMENT_PROVIDERS = ["pp_vnpay_vnpay"]
 
 export type BootstrapResult = {
   regionId: string
@@ -79,28 +82,32 @@ export async function bootstrapStore(container: MedusaContainer): Promise<Bootst
     })
   }
 
-  // 3. Region VND. payment_providers tạm là system_default, BE-5a đổi thành VNPAY.
+  // 3. Region VND, chỉ thanh toán qua VNPAY. Region đã có (DB dev cũ còn pp_system_default) thì
+  //    cập nhật provider cho khớp.
   const { data: regions } = await query.graph({
     entity: "region",
-    fields: ["id"],
+    fields: ["id", "payment_providers.id"],
     filters: { name: REGION_NAME },
   })
-  const regionId =
-    regions[0]?.id ??
-    (
+  let regionId = regions[0]?.id as string | undefined
+  if (!regionId) {
+    regionId = (
       await createRegionsWorkflow(container).run({
         input: {
           regions: [
-            {
-              name: REGION_NAME,
-              currency_code: "vnd",
-              countries: ["vn"],
-              payment_providers: ["pp_system_default"],
-            },
+            { name: REGION_NAME, currency_code: "vnd", countries: ["vn"], payment_providers: PAYMENT_PROVIDERS },
           ],
         },
       })
     ).result[0].id
+  } else {
+    const current = ((regions[0] as any).payment_providers ?? []).map((p: { id: string }) => p.id).sort()
+    if (current.join() !== [...PAYMENT_PROVIDERS].sort().join()) {
+      await updateRegionsWorkflow(container).run({
+        input: { selector: { id: regionId }, update: { payment_providers: PAYMENT_PROVIDERS } },
+      })
+    }
+  }
 
   // 4. Kho Q.7. Chỉ nối provider khi vừa tạo kho (link.create không idempotent).
   const { data: locations } = await query.graph({
