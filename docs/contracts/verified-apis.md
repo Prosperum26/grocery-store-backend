@@ -99,3 +99,19 @@ Cho đơn tạo bằng `completeCart`: `query.graph({ entity: "order_cart", fiel
 
 **Bằng chứng:** `spike-order-flow.ts` (khoá `S8_complete_1`, `S8_complete_2`, `S8_cart_completed_at`).
 **Quyết định:** trang return của storefront có thể gọi lại `complete` an toàn để lấy đơn đã được IPN hoàn tất, không cần dự phòng. Lưu ý: nếu IPN chưa tới thì `complete` ở trang return sẽ cố hoàn tất giỏ khi payment session chưa captured — BE-5a phải kiểm: chỉ gọi `complete` sau khi `verify-return` báo `success` và poll `completed_at`.
+
+## BE-3 — Tìm kiếm, lọc tồn kho / khuyến mãi (VND)
+
+**Kết quả đã chạy thật:**
+- **`src/search/**` bị nạp hết lúc khởi động.** `SearchIndexLoader` (`framework/dist/search/search-index-loader.js`) `dynamicImport` mọi file trong thư mục, trừ `index.*`, `*.d.ts`, `*.md`, `*.map` và tên bắt đầu bằng `_`. Đặt `*.unit.spec.ts` ở đây làm app lỗi `Cannot add a test after tests have started running`. Quy ước: chỉ để helper thuần không side effect trong `src/search/`; unit test của helper đặt ở `src/lib/__tests__/` (ví dụ `search-stock.unit.spec.ts`).
+- **Search Module đã được `defineConfig` đăng ký sẵn** (S1), nên không sửa `medusa-config.ts`.
+- **Tên sự kiện tồn kho** (`utils/dist/core-flows/events.js`): `InventoryLevelWorkflowEvents.{CREATED,UPDATED,DELETED}` = `inventory-level.*`; `ReservationItemWorkflowEvents.{CREATED,UPDATED,DELETED}` = `reservation-item.*`. Payload là `{id}` hoặc mảng `{id}`. Đã thêm cả sáu vào `PRODUCT_EVENTS`.
+- **Đường tra ngược sự kiện → sản phẩm** (chạy được với `query.graph`): `inventory_level.inventory_item_id` / `reservation_item.inventory_item_id` → `inventory_item.variants.product_id`.
+- **Đọc tồn trong lúc index:** `product` với `sales_channels.stock_locations.id` và `variants.inventory_items.inventory.location_levels.{location_id,stocked_quantity,reserved_quantity}`; tồn khả dụng = tổng `stocked − reserved` tại kho nối sales channel (biến thể nhiều item lấy item cạn nhất chia `required_quantity`).
+- **Tìm không dấu:** `filters.q = "ca chua"` ra "Cà chua Đà Lạt" với cấu hình mặc định của provider, **không cần chỉnh `language`** (cả trong test lẫn trên DB dev).
+- **Lọc/sort dùng filter phẳng:** `filters: { in_stock: true }`, `{ on_sale_vnd: true }`, `pagination: { order: { min_price_vnd: "ASC" } }`; trường chưa có trong index trả 400 `Unknown field`.
+- **Test runner:** `waitForSearchReady(container, probe)` trong `integration-tests/http/_helpers.ts` (migration plan + seed plan thủ công, rồi thăm dò `/store/search` tới khi 200); gọi **trước** khi seed sản phẩm. Index nạp bất đồng bộ qua event bus nên test phải `waitFor` (đặt 30 giây; mặc định 5 giây dễ hết hạn khi máy chậm).
+- **DB dev:** `npx medusa db:migrate` đã tạo `product_v2` (schema mới: `vnd`, `in_stock`) ở trạng thái `pending`, nên `db:migrate:search` báo "already up-to-date". Version chỉ chuyển `ready` và nạp 32 tài liệu khi **app khởi động** (`medusa develop`, mất khoảng 135 giây trên máy này). Sau đó `in_stock=true` ra 31 sản phẩm (trừ `tom-the-tuoi`), `on_sale_vnd=true` ra 3 sản phẩm.
+
+**Bằng chứng:** `integration-tests/http/search.spec.ts` (6 test), `src/lib/__tests__/search-stock.unit.spec.ts`; kiểm đột biến: vô hiệu nhánh `reservation-item` thì test "giữ chỗ" đỏ (`waitFor` hết hạn).
+**Quyết định:** lần seed đầu trên DB mới cần khởi động app một lần để index kích hoạt; `npm run seed` (`medusa exec`) không kích hoạt version mới.
