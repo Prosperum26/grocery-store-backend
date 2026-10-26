@@ -1,4 +1,10 @@
-import { allowFields, configureStoreSearch, defineMiddlewares } from '@medusajs/framework/http'
+import {
+  allowFields,
+  configureStoreSearch,
+  defineMiddlewares,
+  validateAndTransformBody,
+} from '@medusajs/framework/http'
+import { SetDeliverySlotBody } from './store/carts/[id]/delivery-slot/validators'
 
 // The product index declares filterable `status` and `sales_channel_ids`, so
 // the route narrows it to published products in the key's sales channels.
@@ -18,6 +24,11 @@ export default defineMiddlewares({
           'categories.name'
         ),
       ],
+    },
+    {
+      method: ['POST'],
+      matcher: '/store/carts/:id/delivery-slot',
+      middlewares: [validateAndTransformBody(SetDeliverySlotBody)],
     },
     // Order retrieve omits `metadata` (the list route has it); needed for metadata.stage.
     // Risk: this route is unauthenticated, anyone holding the order UUID can read it.
