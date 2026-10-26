@@ -115,3 +115,17 @@ Cho đơn tạo bằng `completeCart`: `query.graph({ entity: "order_cart", fiel
 
 **Bằng chứng:** `integration-tests/http/search.spec.ts` (6 test), `src/lib/__tests__/search-stock.unit.spec.ts`; kiểm đột biến: vô hiệu nhánh `reservation-item` thì test "giữ chỗ" đỏ (`waitFor` hết hạn).
 **Quyết định:** lần seed đầu trên DB mới cần khởi động app một lần để index kích hoạt; `npm run seed` (`medusa exec`) không kích hoạt version mới.
+
+## BE-4 — Khung giờ giao hàng
+
+**Kết quả đã chạy thật:**
+- **Error handler ghi đè `code` của lỗi CONFLICT.** `framework/dist/http/middlewares/error-handler.js`: mọi `MedusaError.Types.CONFLICT` trả 409 nhưng đặt `body.code = "invalid_state_error"` và thay `message`. Vì vậy `MedusaError(CONFLICT, msg, "SLOT_UNAVAILABLE")` không tới được client; route `POST /store/carts/:id/delivery-slot` bắt lỗi có `code === "SLOT_UNAVAILABLE"` và tự trả `409 { code, type, message }`. `NOT_FOUND` → 404 giữ nguyên `message` (dùng để nêu id bị thiếu).
+- **Giỏ không tồn tại → 404:** `useQueryGraphStep({ entity: "cart", filters: { id }, options: { throwIfKeyNotFound: true } })` ném lỗi not_found có chứa id giỏ.
+- **Ghi metadata:** `updateCartsStep([{ id, metadata }])`; workflow tự gộp `{ ...metadata cũ, slot }` nên `delivery_note` được giữ. `cart.metadata.slot` là object `{ id, label, startsAt, endsAt, fee }` (không lưu `available` vì đổi theo thời gian).
+- **Body:** `validateAndTransformBody(z.object({ slot_id: z.string().min(1) }))` (zod từ `@medusajs/framework/zod`) trong `middlewares.ts` với `method: ['POST']`; thiếu `slot_id` → 400.
+- **Giờ VN không phụ thuộc máy:** `listSlots` cộng 7 giờ rồi chỉ dùng `getUTC*`/`toISOString`; ranh giới: khung mở khi `startsAt − now ≥ 60 phút` (đúng 60 phút còn đặt được, thiếu 1 giây thì không).
+- **Giả đồng hồ trong integration test:** `jest.useFakeTimers({ now, doNotFake: [mọi timer…] })` chỉ giả `Date`; app (`inApp: true`) cùng tiến trình nên `new Date()` trong step nhận đúng giờ giả. Bọc quanh từng request và `useRealTimers()` trong `finally`.
+- **Khung giờ trong thiết kế** (`Com4Fud_UI_SVG/_source/src/pages_b.js`, mục "Thời gian giao"): 07:00–09:00, 15:00–17:00, 17:00–19:00, 19:00–21:00. Không có khung 08h; id khung sáng là `…T07`.
+
+**Bằng chứng:** `src/lib/delivery/__tests__/slots.unit.spec.ts` (7 test), `integration-tests/http/delivery-slots.spec.ts` (6 test).
+**Quyết định:** `GET /store/delivery-slots` cũng đi qua workflow `list-delivery-slots` (một step) để route nào cũng chỉ gọi workflow.
