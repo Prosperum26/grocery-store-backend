@@ -19,7 +19,7 @@
 | BE-4 | Khung giờ giao (`/store/delivery-slots`) + phí giao | P1 | BE-1 | [ ] |
 | BE-5 | Thanh toán chỉ VNPAY (provider tạm) + mã `TUOI20` | P1 | BE-1 | [ ] |
 | BE-6 | Trạng thái đơn `metadata.stage` + subscriber | P1 | BE-2 | [ ] |
-| BE-7 | Bắt đầu giao: workflow + widget Admin + ước giờ tới | P1 | BE-6 | [ ] |
+| BE-7 | Bắt đầu giao: workflow + widget Admin + ước giờ tới | P1 | BE-6 | [x] a86c183 |
 | BE-8 | Khách tự hủy đơn khi còn "Chờ xác nhận" | P2 | BE-6 | [ ] |
 | BE-9 | Stub `reorder-basket` và `warm` | P2 | BE-2 | [ ] |
 | BE-10 | Hợp đồng Trợ lý Bếp / Công thức (chỉ kiểu dữ liệu + fixture) | P2 | | [ ] |
@@ -210,11 +210,11 @@ Mọi route `/store/*` cần `x-publishable-api-key`; route của khách cần t
 
 **Xong khi:** từ Admin bấm "Bắt đầu giao" trên đơn đang `PREPARING`, nhập tên tài xế và biển số; đơn chuyển `SHIPPING`, có `delivery.eta_at` và `distance_km`; `notice_sent_at` được ghi (tức là "thông báo đã gửi").
 
-- [ ] Quyết định O5 và O2. Bảng khoảng cách phường/quận → km nằm ngay trong `delivery-estimate.ts`, kèm comment nguồn. Ví dụ thiết kế: Sky Garden, Q.7, 2,4 km, tới 17:35.
-- [ ] Test unit `estimateDelivery` (ví dụ ở trên cho kết quả đúng; địa chỉ lạ dùng giá trị mặc định có cảnh báo, không ném lỗi).
-- [ ] Workflow: tạo shipment qua workflow lõi của Medusa, rồi đặt `stage = SHIPPING`, ghi `delivery`; có compensation (hoàn lại `stage`) khi bước tạo shipment lỗi.
-- [ ] Widget: form 2 ô + nút; chỉ hiện khi `stage === "PREPARING"`. Tra docs admin-sdk trước khi viết.
-- [ ] Đề xuất commit: `feat(delivery): start-delivery workflow with ETA and admin widget`
+- [x] Quyết định O5 và O2. Bảng km theo quận nằm trong `src/lib/delivery/estimate.ts` (không phải `delivery-estimate.ts`), 20 km/h, mặc định 6 km. Không gửi push, chỉ ghi `notice_sent_at`.
+- [x] Test unit `estimateDelivery` (Q.7 = 9 phút, Q.1 = 30 phút, quận lạ = 18 phút, không ném lỗi).
+- [x] Workflow: **khác plan:** `stage` do subscriber `shipment.created` (BE-6) đặt, workflow chỉ ghi `delivery` rồi tạo shipment; compensation khôi phục `metadata.delivery` (không phải `stage`).
+- [x] Widget: **khác plan:** `src/admin/widgets/order-start-delivery.tsx`, zone `order.details.side`, một nút "Bắt đầu giao" (không có form), nên `delivery` chưa có `driver_name` và `plate`.
+- [x] Commit: `a86c183` `feat(delivery): start-delivery workflow with ETA and admin widget`
 
 ## Task BE-8: Khách tự hủy đơn
 
