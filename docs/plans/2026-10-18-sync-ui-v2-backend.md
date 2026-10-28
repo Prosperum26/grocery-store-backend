@@ -13,18 +13,20 @@
 
 | Task | Nội dung | Ưu tiên | Phụ thuộc | Trạng thái |
 | :--- | :--- | :---: | :--- | :--- |
-| BE-1 | Region VND, kho Q.7, tắt dữ liệu mẫu áo quần | P0 | | [ ] |
-| BE-2 | Seed catalog thực phẩm + khách demo + đơn demo | P0 | BE-1 | [ ] |
-| BE-3 | Tìm kiếm/lọc: `in_stock`, `on_sale_vnd`, đúng category | P0 | BE-2 | [ ] |
-| BE-4 | Khung giờ giao (`/store/delivery-slots`) + phí giao | P1 | BE-1 | [ ] |
-| BE-5 | Thanh toán chỉ VNPAY (provider tạm) + mã `TUOI20` | P1 | BE-1 | [ ] |
-| BE-6 | Trạng thái đơn `metadata.stage` + subscriber | P1 | BE-2 | [ ] |
-| BE-7 | Bắt đầu giao: workflow + widget Admin + ước giờ tới | P1 | BE-6 | [x] a86c183 |
-| BE-8 | Khách tự hủy đơn khi còn "Chờ xác nhận" | P2 | BE-6 | [x] c509fb0 |
-| BE-9 | Stub `reorder-basket` và `warm` | P2 | BE-2 | [ ] |
-| BE-10 | Hợp đồng Trợ lý Bếp / Công thức (chỉ kiểu dữ liệu + fixture) | P2 | | [ ] |
-| BE-11 | Admin: Việt hóa, widget Tổng quan, widget Sắp cạn kho | P3 | BE-2 | [ ] |
-| BE-12 | Dọn dẹp, cập nhật `.env.template`, README | P3 | tất cả | [ ] |
+| BE-1 | Region VND, kho Q.7, tắt dữ liệu mẫu áo quần | P0 | | [x] Xong · `1bd9761`, `d721719` |
+| BE-2 | Seed catalog thực phẩm + khách demo + đơn demo | P0 | BE-1 | [~] Một phần · catalog tạm 32 món `e73a9fc`, `f8ced2b`; chưa có khách/admin/đơn demo (BE-2c), chưa có ảnh (BE-2b); dự kiến thay catalog bằng `data/catalog_v2_updated.xlsx` |
+| BE-3 | Tìm kiếm/lọc: `in_stock`, `on_sale_vnd`, đúng category | P0 | BE-2 | [x] Xong · `63e2ee5`, `0efdbef`, `f72353c` |
+| BE-4 | Khung giờ giao (`/store/delivery-slots`) + phí giao | P1 | BE-1 | [x] Xong · `241b090`, `8d54c17` (khác plan: phí cố định 15.000đ, slot không còn là shipping option) |
+| BE-5 | Thanh toán chỉ VNPAY (provider tạm) + mã `TUOI20` | P1 | BE-1 | [~] Một phần · VNPAY thật `84a51c7`, `3a67d5f`, `902aec8`; mã giảm giá `73c1d05`, `a23122c`; chưa thanh toán thử trên sandbox VNPAY |
+| BE-6 | Trạng thái đơn `metadata.stage` + subscriber | P1 | BE-2 | [x] Xong · `2672d88`, `7c4e1fa`, `a1635ae` (chưa có nút "Xác nhận" trong Admin, chỉ có route) |
+| BE-7 | Bắt đầu giao: workflow + widget Admin + ước giờ tới | P1 | BE-6 | [~] Một phần · `a86c183`; chưa xem nút trong Admin, chưa có `driver_name`/`plate` |
+| BE-8 | Khách tự hủy đơn khi còn "Chờ xác nhận" | P2 | BE-6 | [~] Một phần · `c509fb0`; chưa gọi API hoàn tiền sandbox VNPAY thật, chưa xử lý mã `94`/lỗi mạng khi hoàn |
+| BE-9 | Stub `reorder-basket` và `warm` | P2 | BE-2 | [ ] Chưa làm |
+| BE-10 | Hợp đồng Trợ lý Bếp / Công thức (chỉ kiểu dữ liệu + fixture) | P2 | | [ ] Chưa làm |
+| BE-11 | Admin: Việt hóa, widget Tổng quan, widget Sắp cạn kho | P3 | BE-2 | [ ] Chưa làm |
+| BE-12 | Dọn dẹp, cập nhật `.env.template`, README | P3 | tất cả | [ ] Chưa làm (đã xoá `initial-data-seed.ts`; còn `seed-demo-products.ts`, route `custom` mẫu) |
+
+Ký hiệu: `[x]` xong và đã kiểm · `[~]` code và test xong nhưng còn bước kiểm tay hoặc phần thiếu · `[ ]` chưa làm. Cập nhật 2026-10-28, đối chiếu với code và nhật ký tiến độ của người làm backend; chi tiết từng task ở nhật ký đó và `docs/contracts/verified-apis.md`.
 
 Ưu tiên tính cho **giai đoạn 2**: P0 = FE không chạy được với dữ liệu thật nếu thiếu. P1 = luồng mua hàng đầy đủ. P2/P3 = có thể để sau, FE vẫn dùng khối giữ chỗ. Trong #11 không task nào bắt buộc.
 
@@ -290,4 +292,5 @@ Mọi route `/store/*` cần `x-publishable-api-key`; route của khách cần t
 
 | Ngày | Người | Đã xong | Dở dang / lưu ý |
 | :--- | :--- | :--- | :--- |
+| 2026-10-28 | | BE-1, BE-3, BE-4, BE-6 xong; BE-2, BE-5, BE-7, BE-8 xong phần code (commit cuối `2c11113`) | Thanh toán và hoàn tiền thử trên sandbox VNPAY; xem nút "Bắt đầu giao" trong Admin; khách/đơn demo (BE-2c); BE-9 đến BE-12 chưa làm |
 | 2026-10-18 | | Chưa bắt đầu, mới có kế hoạch | |
