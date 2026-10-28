@@ -22,7 +22,7 @@
 | BE-7 | Bắt đầu giao: workflow + widget Admin + ước giờ tới | P1 | BE-6 | [x] Xong · `a86c183`, `f676dbc`; widget có ô tên tài xế và biển số, `metadata.delivery` đủ 6 trường API-7; đã kiểm trong Admin 28/10 (đơn #6). FE còn phải đọc `metadata.delivery.driver_name`/`plate` thay cho tài xế mẫu |
 | BE-8 | Khách tự hủy đơn khi còn "Chờ xác nhận" | P2 | BE-6 | [~] Một phần · `c509fb0`; chưa gọi API hoàn tiền sandbox VNPAY thật, chưa xử lý mã `94`/lỗi mạng khi hoàn |
 | BE-9 | Stub `reorder-basket` và `warm` | P2 | BE-2 | [x] Xong · `51a300d`; xếp theo tần suất trong đơn DELIVERED, bản tạm cho module Predictive |
-| BE-10 | Hợp đồng Trợ lý Bếp / Công thức (chỉ kiểu dữ liệu + fixture) | P2 | | [ ] Chưa làm |
+| BE-10 | Hợp đồng Trợ lý Bếp / Công thức (chỉ kiểu dữ liệu + fixture) | P2 | | [x] Xong · `41df2eb`; `src/types/assistant.ts`, `docs/contracts/assistant-recipes.md`, ví dụ từ dữ liệu thật; hai route kiểm body rồi trả 501 cho tới khi nối AI service |
 | BE-11 | Admin: Việt hóa, widget Tổng quan, widget Sắp cạn kho | P3 | BE-2 | [ ] Chưa làm |
 | BE-12 | Dọn dẹp, cập nhật `.env.template`, README | P3 | tất cả | [ ] Chưa làm (đã xoá `initial-data-seed.ts`; còn `seed-demo-products.ts`, route `custom` mẫu) |
 
@@ -75,7 +75,7 @@ Mọi route `/store/*` cần `x-publishable-api-key`; route của khách cần t
 | API-5 | `order.metadata` | Mới (BE-6) | `stage`: `PENDING\|CONFIRMED\|PREPARING\|SHIPPING\|DELIVERED\|CANCELLED`; `stage_log`: `[{ stage, at }]` (ISO). FE đọc trực tiếp, **không tự suy ra** từ trạng thái Medusa. |
 | API-6 | `POST /store/orders/:id/cancel` | Mới (BE-8) | `200 { order }`; `409` nếu `stage != PENDING`. |
 | API-7 | `order.metadata.delivery` | Mới (BE-7) | `{ driver_name, plate, distance_km, eta_at, started_at, notice_sent_at }`; chỉ có từ lúc `SHIPPING`. |
-| API-8 | `POST /store/recipes/semantic-search`, `POST /store/assistant/chat` | Hợp đồng ở BE-10, cài đặt thật ở repo AI | Xem kiểu `Recipe`, `MealPlan`, `AssistantReply` ở BE-10. |
+| API-8 | `POST /store/recipes/semantic-search`, `POST /store/assistant/chat` | Giữ chỗ ở BE-10 (kiểm body, trả `501 IN_DEVELOPMENT`); cài đặt thật cần AI service | Body và response: `src/types/assistant.ts`, giải thích ở `docs/contracts/assistant-recipes.md`. |
 | API-9 | `GET /admin/dashboard/summary` | Mới (BE-11) | `{ revenue_today, orders_today, aov, low_stock_count, revenue_7d: number[] }`. |
 
 **Ánh xạ trạng thái đơn (đề xuất để đóng Q5 ở `docs/06`):**
@@ -292,6 +292,7 @@ Mọi route `/store/*` cần `x-publishable-api-key`; route của khách cần t
 
 | Ngày | Người | Đã xong | Dở dang / lưu ý |
 | :--- | :--- | :--- | :--- |
+| 2026-10-29 | | BE-10 xong (`41df2eb`); integration 14 suite / 57 test pass. Nhóm chốt: BE-2b làm sau, FE thêm 3 ô danh mục | Gửi hợp đồng cho nhóm AI (câu hỏi A1–A4); còn VNPAY sandbox (BE-5, BE-8), BE-11, BE-12 |
 | 2026-10-28 | | BE-7 xong (`f676dbc`): tài xế và biển số khi bắt đầu giao, kiểm trong Admin trên đơn #6; integration 13 suite / 56 test pass | FE: trang theo dõi đơn đổi `SAMPLE_DRIVER` sang `order.metadata.delivery`; còn VNPAY sandbox (BE-5, BE-8), BE-10, BE-11, BE-12 |
 | 2026-10-28 | | BE-9 xong (`51a300d`); BE-7 đã kiểm nút trong Admin | BE-7 còn `driver_name`/`plate`; VNPAY sandbox (BE-5, BE-8); BE-10, BE-11, BE-12 |
 | 2026-10-28 | | BE-2 xong: catalog v2 (2.129 món, 11 danh mục, 3 sản phẩm ẩn) và khách/admin/7 đơn demo (`43b0265`); integration 11 suite cũ pass (53 test) và seed-demo.spec pass khi chạy riêng | BE-2b (ảnh) hoãn; còn thử VNPAY sandbox, xem nút Bắt đầu giao trong Admin, BE-9 đến BE-12 |
