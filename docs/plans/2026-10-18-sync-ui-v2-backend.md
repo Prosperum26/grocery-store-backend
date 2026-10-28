@@ -67,16 +67,20 @@ Mọi route `/store/*` cần `x-publishable-api-key`; route của khách cần t
 
 | ID | Route | Trạng thái | Response / ghi chú |
 | :--- | :--- | :--- | :--- |
-| API-1 | `GET /store/products` | Medusa | Thêm `fields=+metadata,+variants.inventory_quantity,+variants.weight`. FE tính giá gốc/giá bán từ `calculated_price`. |
-| API-2 | `POST /store/search` | Medusa Search (cấu hình ở BE-3) | Lọc `category`, `in_stock: true`, `on_sale_vnd: true`; sắp xếp. Hình dạng body chốt ở BE-3 rồi ghi lại tại đây. |
+| API-1 | `GET /store/products` | Medusa (+ `allowFields` ở BE-3a) | Thêm `fields=+metadata,+variants.inventory_quantity,+variants.weight`; danh mục: `+categories.handle` (cùng `id`, `name`) hoặc `*categories`. FE tính giá gốc/giá bán từ `calculated_price`. Sản phẩm ẩn (`draft`) không trả về. |
+| API-2 | `POST /store/search` | Medusa Search, provider postgres có sẵn (BE-3) | Body: `{ entity: "product", filters?: { q?, category?, in_stock?, on_sale_vnd? }, pagination?: { take? (<=100), skip?, order?: { min_price_vnd: "ASC"\|"DESC" } } }` (hoặc `{ queries: [...] }`). `category` là **tên** danh mục ("Rau củ"); `q` tìm không dấu. Trả `{ results: [{ hits: [{ id, document }], metadata: { count, skip, take } }] }`. Trường không có trong index trả 400 `Unknown field`. Chi tiết: `verified-apis.md` S1, BE-3. |
 | API-3 | `GET /store/predictive/reorder-basket` (cần khách đăng nhập) | Stub ở BE-9 | `{ status: "ready"\|"warming"\|"empty", items: [{ variant_id, product_id, handle, title, unit_label, art, tint, quantity, unit_price, in_stock }], total }`. Tối đa 5 món; `unit_price` là giá đang tính (gồm khuyến mãi); `in_stock` = còn đủ `quantity`; `total` chỉ cộng món còn hàng (số tiền của nút "Thêm tất cả"). Stub không trả `warming`; `art`/`tint` có thể `null`. **Không** trả xác suất, chu kỳ, lý do. |
 | API-3b | `POST /store/predictive/warm` | Mới (stub ở BE-9) | `202 {}`; không chờ. |
 | API-4 | `GET /store/delivery-slots` (không còn `cart_id`: phí giao cố định 15.000đ) | Mới (BE-4) | `{ slots: [{ id, label, startsAt, endsAt, fee, available }] }`, `id` dạng `2026-10-27T07` (giờ VN). FE chọn slot bằng `POST /store/carts/:id/delivery-slot` body `{ slot_id }` → ghi `cart.metadata.slot`; khung đã qua hoặc bắt đầu trong 60 phút tới → 409 `{ code: "SLOT_UNAVAILABLE" }`, id lạ hoặc giỏ lạ → 404. Slot không còn là shipping option; shipping method vẫn thêm bằng option "Giao tận nhà". Chi tiết ở plan 2026-10-25, task BE-4. |
-| API-5 | `order.metadata` | Mới (BE-6) | `stage`: `PENDING\|CONFIRMED\|PREPARING\|SHIPPING\|DELIVERED\|CANCELLED`; `stage_log`: `[{ stage, at }]` (ISO). FE đọc trực tiếp, **không tự suy ra** từ trạng thái Medusa. |
-| API-6 | `POST /store/orders/:id/cancel` | Mới (BE-8) | `200 { order }`; `409` nếu `stage != PENDING`. |
-| API-7 | `order.metadata.delivery` | Mới (BE-7) | `{ driver_name, plate, distance_km, eta_at, started_at, notice_sent_at }`; chỉ có từ lúc `SHIPPING`. |
+| API-5 | `order.metadata` | Mới (BE-6) | `stage`: `PENDING\|CONFIRMED\|PREPARING\|SHIPPING\|DELIVERED\|CANCELLED`; `stage_log`: `[{ stage, at, by }]` (`at` ISO; `by` là id admin, `seed` hoặc `backfill` nếu có). Đơn demo có thêm `code` (mã hiển thị `C4F-...`). FE đọc trực tiếp, **không tự suy ra** từ trạng thái Medusa; đổi stage do subscriber chạy bất đồng bộ nên đọc lại đơn sau khi thao tác. |
+| API-6 | `POST /store/orders/:id/cancel` (cần khách đăng nhập) | BE-8 | `200 { order: { id, status: "canceled" } }` sau khi hoàn tiền thành công (stage `CANCELLED` do subscriber đặt, đọc lại đơn); `409 { code: "ORDER_NOT_CANCELLABLE" }` khi `stage != PENDING`, đã huỷ hoặc còn fulfillment; `502 { code: "REFUND_FAILED" }` khi hoàn tiền lỗi (đơn giữ nguyên); `404` đơn lạ hoặc của khách khác; `401` chưa đăng nhập. |
+| API-7 | `order.metadata.delivery` | BE-7 | `{ driver_name, plate, distance_km, eta_at, started_at, notice_sent_at }`; chỉ có từ lúc `SHIPPING`. Ghi bởi `POST /admin/orders/:id/start-delivery` body `{ driver_name, plate }` (thiếu → 400; đơn không ở `PREPARING` → 409). |
 | API-8 | `POST /store/recipes/semantic-search`, `POST /store/assistant/chat` | Giữ chỗ ở BE-10 (kiểm body, trả `501 IN_DEVELOPMENT`); cài đặt thật cần AI service | Body và response: `src/types/assistant.ts`, giải thích ở `docs/contracts/assistant-recipes.md`. |
 | API-9 | `GET /admin/dashboard/summary` (+ `GET /admin/dashboard/low-stock?limit=`) | BE-11 | `{ revenue_today, orders_today, aov, low_stock_count, revenue_7d: number[] }`. Ngày theo giờ VN, theo ngày tạo đơn, bỏ đơn huỷ và nháp; `aov` là trung bình 7 ngày; `revenue_7d` cũ nhất trước. low-stock: `{ items: [{ product_id, title, variant_title, sku, available, low_stock }], count }`, tồn khả dụng <= `low_stock` (gồm hết hàng). |
+| API-10 | `GET /store/customers/me/vouchers` (cần khách đăng nhập) | BE-5b | `{ vouchers: [{ code, title, description, discountLabel, minSubtotal, endsAt, status: "usable"\|"not_eligible"\|"expired" }] }`: mã công khai và mã nhóm khách thuộc. Áp mã vào giỏ dùng route Medusa `POST /store/carts/:id/promotions`; mã chưa đủ điều kiện vẫn 200 nên phải đọc lại `discount_total`, chỉ mã không tồn tại mới 4xx. |
+| API-11 | `GET /store/vnpay/verify-return?<vnp_*>` | BE-5a | `{ valid, success }`: chỉ kiểm chữ ký và `vnp_ResponseCode` để trang return hiển thị; không đổi đơn. |
+| API-12 | `GET /hooks/vnpay/ipn?<vnp_*>` | BE-5a | Chỉ VNPAY gọi. Luôn HTTP 200 `{ RspCode, Message }` (00, 01, 02, 04, 97, 99); thanh toán hợp lệ thì Medusa tạo đơn từ giỏ. |
+| API-13 | `POST /admin/orders/:id/confirm` | BE-6 | `PENDING` → `CONFIRMED`; đơn không ở `PENDING` → 400, đơn lạ → 404. Chưa có nút trong Admin. |
 
 **Ánh xạ trạng thái đơn (đề xuất để đóng Q5 ở `docs/06`):**
 
@@ -274,11 +278,11 @@ Mọi route `/store/*` cần `x-publishable-api-key`; route của khách cần t
 
 ## Task BE-12: Dọn dẹp
 
-- [ ] Xóa `src/scripts/seed-demo-products.ts` (áo quần) và phần seed áo quần còn sót.
-- [ ] Cập nhật `.env.template` (`DEMO_PASSWORD`, các biến search nếu BE-3 thêm).
-- [ ] Cập nhật `README.md`: lệnh seed mới (`medusa exec ./src/scripts/seed-grocery.ts`).
-- [ ] Rà lại bảng API ở mục 3 so với route thật; đồng bộ sang file FE.
-- [ ] Đề xuất commit: `chore: remove apparel demo seed, update env template and README`
+- [x] Xóa `src/scripts/seed-demo-products.ts` (áo quần) và hai route mẫu `custom` (`1b9bda9`).
+- [x] Cập nhật `.env.template`: `DEMO_PASSWORD` có từ BE-2c; thêm ghi chú `REDIS_URL` chưa dùng, secret chỉ cho dev, dạng `DATABASE_URL`; bỏ script `storefront:dev` (`410c712`). BE-3 không thêm biến search nào.
+- [x] Script test chạy được trên Windows bằng `cross-env`; lock do npm 10.9.8 sinh (`e8bf3c9`).
+- [x] Cập nhật `README.md`: viết lại bằng tiếng Anh theo repo thật (npm, Docker Postgres, seed `npm run seed`).
+- [x] Rà bảng API mục 3 với route thật: sửa API-1, 2, 5, 6, 7; thêm API-10 đến 13. File FE không có bảng hợp đồng riêng (chỉ bảng giữ chỗ ở mục 4, vẫn đúng).
 
 ## 5. Cách chia đôi công việc khi sync dở
 
