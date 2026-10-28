@@ -20,7 +20,7 @@
 | BE-5 | Thanh toán chỉ VNPAY (provider tạm) + mã `TUOI20` | P1 | BE-1 | [ ] |
 | BE-6 | Trạng thái đơn `metadata.stage` + subscriber | P1 | BE-2 | [ ] |
 | BE-7 | Bắt đầu giao: workflow + widget Admin + ước giờ tới | P1 | BE-6 | [x] a86c183 |
-| BE-8 | Khách tự hủy đơn khi còn "Chờ xác nhận" | P2 | BE-6 | [ ] |
+| BE-8 | Khách tự hủy đơn khi còn "Chờ xác nhận" | P2 | BE-6 | [x] c509fb0 |
 | BE-9 | Stub `reorder-basket` và `warm` | P2 | BE-2 | [ ] |
 | BE-10 | Hợp đồng Trợ lý Bếp / Công thức (chỉ kiểu dữ liệu + fixture) | P2 | | [ ] |
 | BE-11 | Admin: Việt hóa, widget Tổng quan, widget Sắp cạn kho | P3 | BE-2 | [ ] |
@@ -224,9 +224,9 @@ Mọi route `/store/*` cần `x-publishable-api-key`; route của khách cần t
 
 **Xong khi:** gọi lúc `stage=PENDING` trả 200 và đơn sang `CANCELLED`; lúc `CONFIRMED` trở đi trả 409; đơn của khách khác trả 404.
 
-- [ ] Workflow bọc `cancelOrderWorkflow` của Medusa, kiểm tra quyền sở hữu và `stage`.
-- [ ] Test http cho 3 trường hợp trên.
-- [ ] Đề xuất commit: `feat(orders): customer cancel while pending`
+- [x] Workflow bọc `cancelOrderWorkflow` của Medusa, kiểm tra quyền sở hữu và `stage`. **Khác plan:** `cancelOrderWorkflow` không dừng khi hoàn tiền lỗi (`refundPaymentsStep` nuốt lỗi provider), nên workflow tự hoàn tiền bằng `refundPaymentsWorkflow` và kiểm lại trước khi huỷ; lỗi trả `502 REFUND_FAILED`. Thêm API hoàn tiền VNPAY (`refund-client.ts`) nối vào `VnpayProviderService.refundPayment`. Chi tiết ở `verified-apis.md` mục BE-8.
+- [x] Test http: 6 ca (huỷ được, `CONFIRMED` 409, đơn người khác 404, chưa đăng nhập 401, còn fulfillment 409, hoàn tiền lỗi 502), thêm 15 test unit cho refund. **Chưa gọi sandbox VNPAY thật.**
+- [x] Commit: `c509fb0` `feat(orders): customer cancel with VNPAY refund`
 
 ## Task BE-9: Stub `reorder-basket` và `warm`
 
