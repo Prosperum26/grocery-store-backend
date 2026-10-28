@@ -19,9 +19,9 @@
 | BE-4 | Khung giờ giao (`/store/delivery-slots`) + phí giao | P1 | BE-1 | [x] Xong · `241b090`, `8d54c17` (khác plan: phí cố định 15.000đ, slot không còn là shipping option) |
 | BE-5 | Thanh toán chỉ VNPAY (provider tạm) + mã `TUOI20` | P1 | BE-1 | [~] Một phần · VNPAY thật `84a51c7`, `3a67d5f`, `902aec8`; mã giảm giá `73c1d05`, `a23122c`; chưa thanh toán thử trên sandbox VNPAY |
 | BE-6 | Trạng thái đơn `metadata.stage` + subscriber | P1 | BE-2 | [x] Xong · `2672d88`, `7c4e1fa`, `a1635ae` (chưa có nút "Xác nhận" trong Admin, chỉ có route) |
-| BE-7 | Bắt đầu giao: workflow + widget Admin + ước giờ tới | P1 | BE-6 | [~] Một phần · `a86c183`; chưa xem nút trong Admin, chưa có `driver_name`/`plate` |
+| BE-7 | Bắt đầu giao: workflow + widget Admin + ước giờ tới | P1 | BE-6 | [~] Một phần · `a86c183`; nút đã kiểm trong Admin 28/10 (đơn #7: ETA, 3 km, rồi đánh dấu đã giao). Còn thiếu `driver_name`/`plate` của API-7: widget chưa có ô nhập, chờ nhóm chốt |
 | BE-8 | Khách tự hủy đơn khi còn "Chờ xác nhận" | P2 | BE-6 | [~] Một phần · `c509fb0`; chưa gọi API hoàn tiền sandbox VNPAY thật, chưa xử lý mã `94`/lỗi mạng khi hoàn |
-| BE-9 | Stub `reorder-basket` và `warm` | P2 | BE-2 | [ ] Chưa làm |
+| BE-9 | Stub `reorder-basket` và `warm` | P2 | BE-2 | [x] Xong · `51a300d`; xếp theo tần suất trong đơn DELIVERED, bản tạm cho module Predictive |
 | BE-10 | Hợp đồng Trợ lý Bếp / Công thức (chỉ kiểu dữ liệu + fixture) | P2 | | [ ] Chưa làm |
 | BE-11 | Admin: Việt hóa, widget Tổng quan, widget Sắp cạn kho | P3 | BE-2 | [ ] Chưa làm |
 | BE-12 | Dọn dẹp, cập nhật `.env.template`, README | P3 | tất cả | [ ] Chưa làm (đã xoá `initial-data-seed.ts`; còn `seed-demo-products.ts`, route `custom` mẫu) |
@@ -69,7 +69,7 @@ Mọi route `/store/*` cần `x-publishable-api-key`; route của khách cần t
 | :--- | :--- | :--- | :--- |
 | API-1 | `GET /store/products` | Medusa | Thêm `fields=+metadata,+variants.inventory_quantity,+variants.weight`. FE tính giá gốc/giá bán từ `calculated_price`. |
 | API-2 | `POST /store/search` | Medusa Search (cấu hình ở BE-3) | Lọc `category`, `in_stock: true`, `on_sale_vnd: true`; sắp xếp. Hình dạng body chốt ở BE-3 rồi ghi lại tại đây. |
-| API-3 | `GET /store/predictive/reorder-basket` | Mới (stub ở BE-9) | `{ status: "ready"\|"warming"\|"empty", items: [{ variant_id, product_id, title, unit_label, art, tint, quantity, unit_price, in_stock }], total }`. **Không** trả xác suất, chu kỳ, lý do. |
+| API-3 | `GET /store/predictive/reorder-basket` (cần khách đăng nhập) | Stub ở BE-9 | `{ status: "ready"\|"warming"\|"empty", items: [{ variant_id, product_id, handle, title, unit_label, art, tint, quantity, unit_price, in_stock }], total }`. Tối đa 5 món; `unit_price` là giá đang tính (gồm khuyến mãi); `in_stock` = còn đủ `quantity`; `total` chỉ cộng món còn hàng (số tiền của nút "Thêm tất cả"). Stub không trả `warming`; `art`/`tint` có thể `null`. **Không** trả xác suất, chu kỳ, lý do. |
 | API-3b | `POST /store/predictive/warm` | Mới (stub ở BE-9) | `202 {}`; không chờ. |
 | API-4 | `GET /store/delivery-slots` (không còn `cart_id`: phí giao cố định 15.000đ) | Mới (BE-4) | `{ slots: [{ id, label, startsAt, endsAt, fee, available }] }`, `id` dạng `2026-10-27T07` (giờ VN). FE chọn slot bằng `POST /store/carts/:id/delivery-slot` body `{ slot_id }` → ghi `cart.metadata.slot`; khung đã qua hoặc bắt đầu trong 60 phút tới → 409 `{ code: "SLOT_UNAVAILABLE" }`, id lạ hoặc giỏ lạ → 404. Slot không còn là shipping option; shipping method vẫn thêm bằng option "Giao tận nhà". Chi tiết ở plan 2026-10-25, task BE-4. |
 | API-5 | `order.metadata` | Mới (BE-6) | `stage`: `PENDING\|CONFIRMED\|PREPARING\|SHIPPING\|DELIVERED\|CANCELLED`; `stage_log`: `[{ stage, at }]` (ISO). FE đọc trực tiếp, **không tự suy ra** từ trạng thái Medusa. |
@@ -292,6 +292,7 @@ Mọi route `/store/*` cần `x-publishable-api-key`; route của khách cần t
 
 | Ngày | Người | Đã xong | Dở dang / lưu ý |
 | :--- | :--- | :--- | :--- |
+| 2026-10-28 | | BE-9 xong (`51a300d`); BE-7 đã kiểm nút trong Admin | BE-7 còn `driver_name`/`plate`; VNPAY sandbox (BE-5, BE-8); BE-10, BE-11, BE-12 |
 | 2026-10-28 | | BE-2 xong: catalog v2 (2.129 món, 11 danh mục, 3 sản phẩm ẩn) và khách/admin/7 đơn demo (`43b0265`); integration 11 suite cũ pass (53 test) và seed-demo.spec pass khi chạy riêng | BE-2b (ảnh) hoãn; còn thử VNPAY sandbox, xem nút Bắt đầu giao trong Admin, BE-9 đến BE-12 |
 | 2026-10-28 | | BE-1, BE-3, BE-4, BE-6 xong; BE-2, BE-5, BE-7, BE-8 xong phần code (commit cuối `2c11113`) | Thanh toán và hoàn tiền thử trên sandbox VNPAY; xem nút "Bắt đầu giao" trong Admin; khách/đơn demo (BE-2c); BE-9 đến BE-12 chưa làm |
 | 2026-10-18 | | Chưa bắt đầu, mới có kế hoạch | |
