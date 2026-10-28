@@ -212,7 +212,9 @@ Region "Việt Nam" chỉ có một phương thức thanh toán: VNPAY (`pp_vnpa
 Mở `http://localhost:9000/app` (tài khoản demo ở mục Seed).
 
 - **Tiếng Việt:** Admin có sẵn bản dịch nhưng mặc định là tiếng Anh, và không đặt mặc định được từ server. Mỗi người chọn một lần ở **Profile → Language → Tiếng Việt**; lựa chọn lưu trong trình duyệt (localStorage `lng`).
-- **Widget của nhóm:** "Tổng quan" trên đầu trang Đơn hàng (`GET /admin/dashboard/summary`), "Sắp cạn kho" trên đầu trang Tồn kho (`GET /admin/dashboard/low-stock`), "Giao hàng" ở cột phải trang chi tiết đơn (`POST /admin/orders/:id/start-delivery`).
+- **Widget của nhóm:** "Tổng quan" ở trang Đơn hàng (`GET /admin/dashboard/summary`), "Sắp cạn kho" ở trang Tồn kho (`GET /admin/dashboard/low-stock`), "Giao hàng" ở cột phải trang chi tiết đơn (`POST /admin/orders/:id/start-delivery`).
+- **Thứ tự widget:** từ 2.21, trang danh sách (Đơn hàng, Tồn kho…) xếp widget **sau** bảng chính, kể cả widget khai báo zone `*.list.before`. Muốn đưa "Tổng quan" lên trên: bấm biểu tượng tùy chỉnh (thanh trượt) trên thanh trên cùng → **Tùy chỉnh trang** → kéo khối lên trên bảng → lưu cho riêng mình hoặc **Lưu cho mọi người**. Bố cục lưu trong DB, nên xoá và tạo lại DB thì phải sắp lại.
+- **Bản dịch bổ sung:** `src/admin/i18n/index.ts` dịch nhóm nút tùy chỉnh bố cục, vốn thiếu trong `vi.json` của Medusa.
 - **Màu:** Medusa 2.21.1 không có cấu hình màu cho Admin (màu là biến CSS cứng trong `@medusajs/dashboard`, file CSS gốc do Medusa tự sinh lúc build). Vì vậy chỉ widget của nhóm dùng màu Com4Fud (`src/admin/lib/com4fud.ts`) ở điểm nhấn; phần còn lại giữ màu Medusa. Đây là lựa chọn của nhóm (BE-11, phương án A), không ghi đè CSS của Medusa.
 
 ## Resources
