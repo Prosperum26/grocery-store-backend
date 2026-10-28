@@ -2,6 +2,8 @@ import { ExecArgs } from "@medusajs/framework/types"
 import { bootstrapStore } from "../lib/seed/bootstrap-store"
 import { seedCatalog } from "../lib/seed/seed-catalog"
 import { loadCatalogV2 } from "../lib/seed/seed-data/load-catalog-v2"
+import { seedDemo } from "../lib/seed/seed-demo"
+import { DEMO_DATA } from "../lib/seed/seed-data/demo"
 import { seedPromotions } from "../lib/seed/seed-promotions"
 
 // Chạy: npm run seed --workspace=@dtc/backend. Idempotent, chạy lại an toàn.
@@ -19,4 +21,13 @@ export default async function seed({ container }: ExecArgs) {
 
   await seedPromotions(container, store)
   console.log("Promotions: TUOI20, THANHVIEN15, HETHAN5 (nhóm khách 'Thành viên')")
+
+  // Khách, admin và đơn demo (BE-2c). Mật khẩu chung đọc từ .env, không viết trong repo.
+  const password = process.env.DEMO_PASSWORD
+  if (!password) {
+    console.warn("Bỏ qua khách/admin/đơn demo: chưa đặt DEMO_PASSWORD trong apps/backend/.env")
+    return
+  }
+  const demo = await seedDemo(container, store, DEMO_DATA, password)
+  console.log(`Demo: admin ${demo.admin ? "created" : "exists"}, ${demo.customers} customers, created ${demo.orders} orders`)
 }

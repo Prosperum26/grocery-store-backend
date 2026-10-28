@@ -2,7 +2,7 @@ import { MedusaContainer } from "@medusajs/framework"
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { createCustomerGroupsWorkflow, createPromotionsWorkflow } from "@medusajs/medusa/core-flows"
 
-const MEMBER_GROUP_NAME = "Thành viên"
+export const MEMBER_GROUP_NAME = "Thành viên"
 const DAY_MS = 24 * 60 * 60 * 1000
 
 /**

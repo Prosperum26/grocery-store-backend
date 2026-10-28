@@ -183,6 +183,22 @@ Lưu ý:
   Script in báo cáo (dòng bị ẩn, đổi tên, giá nghi sai, thiếu quy cách) và sinh lại `tools/catalog/hidden-products.md`. Quy tắc ánh xạ danh mục, ẩn sản phẩm, tồn kho và giá khuyến mãi ở docstring đầu script.
 - Sản phẩm có `note_2` trong xlsx hoặc trùng tên và quy cách với sản phẩm khác được seed với `status = draft`: vẫn có trong DB (`sku = catalog_id`, để AI tra được) nhưng storefront và tìm kiếm không thấy.
 
+### Khách, admin và đơn demo
+
+Đặt `DEMO_PASSWORD` trong `apps/backend/.env` (mật khẩu chung, không commit) rồi chạy `npm run seed`; thiếu biến này thì seed bỏ qua phần demo. Dữ liệu ở `apps/backend/src/lib/seed/seed-data/demo.ts`.
+
+| Tài khoản | Vai trò |
+| :--- | :--- |
+| `hoangnam@com4fud.demo` | Admin (`http://localhost:9000/app`) |
+| `minhthu@com4fud.demo` | Khách, nhóm "Thành viên", 2 địa chỉ ở Quận 7, 7 đơn |
+| `khachmoi@com4fud.demo` | Khách mới, chưa có đơn, không thuộc nhóm |
+
+7 đơn của `minhthu` (mã ở `metadata.code`): 5 đơn theo mock (`C4F-261007-0142` SHIPPING, 3 đơn DELIVERED, `C4F-260924-0207` CANCELLED), `C4F-DEMO-PENDING` để thử khách huỷ đơn và `C4F-DEMO-PREPARING` để thử nút "Bắt đầu giao" trong Admin. Mỗi đơn đi đúng các bước Medusa của stage đó (giữ hàng, đã thanh toán, fulfillment, shipment, đã giao).
+
+- Thanh toán của đơn demo dùng provider hệ thống `pp_system_default` (đánh dấu đã trả), không phải VNPAY, nên huỷ đơn demo không gọi API hoàn tiền VNPAY.
+- `created_at` của đơn là lúc seed (`createOrderWorkflow` không nhận ngày tạo); ngày đặt theo mock nằm trong `metadata.stage_log`.
+- Thử huỷ đơn hoặc "Bắt đầu giao" sẽ đổi đơn demo; muốn có lại đơn ban đầu thì xoá và seed lại DB.
+
 ## Thanh toán VNPAY (sandbox)
 
 Region "Việt Nam" chỉ có một phương thức thanh toán: VNPAY (`pp_vnpay_vnpay`, code ở `apps/backend/src/modules/vnpay`).
