@@ -97,7 +97,11 @@ medusaIntegrationTestRunner({
 
         // Đơn PREPARING dùng được cho demo "Bắt đầu giao" (BE-7), địa chỉ Quận 7.
         const preparing = orders.find((o) => o.metadata?.code === "C4F-DEMO-PREPARING")
-        const start = await api.post(`/admin/orders/${preparing.id}/start-delivery`, {}, admin)
+        const start = await api.post(
+          `/admin/orders/${preparing.id}/start-delivery`,
+          { driver_name: "Nguyễn Văn Đức", plate: "59-X3 482.17" },
+          admin
+        )
         expect(start.status).toBe(200)
         expect(start.data.delivery.distance_km).toBe(3)
       })

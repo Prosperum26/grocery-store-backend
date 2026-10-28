@@ -5,6 +5,7 @@ import {
   defineMiddlewares,
   validateAndTransformBody,
 } from '@medusajs/framework/http'
+import { StartDeliveryBody } from './admin/orders/[id]/start-delivery/validators'
 import { SetDeliverySlotBody } from './store/carts/[id]/delivery-slot/validators'
 
 // The product index declares filterable `status` and `sales_channel_ids`, so
@@ -25,6 +26,12 @@ export default defineMiddlewares({
           'categories.name'
         ),
       ],
+    },
+    // Bắt đầu giao (BE-7): bắt buộc tên tài xế và biển số. /admin/* đã được core xác thực.
+    {
+      method: ['POST'],
+      matcher: '/admin/orders/:id/start-delivery',
+      middlewares: [validateAndTransformBody(StartDeliveryBody)],
     },
     {
       method: ['POST'],

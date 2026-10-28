@@ -14,6 +14,8 @@ import { waitFor } from "./_helpers"
 jest.setTimeout(300 * 1000)
 
 const WAIT_MS = 30000 // subscriber chạy bất đồng bộ
+// Tên tài xế và biển số người điều phối nhập khi bắt đầu giao (API-7).
+const DRIVER = { driver_name: "Nguyễn Văn Đức", plate: "59-X3 482.17" }
 
 // Bật cờ này để hook ép createOrderShipmentWorkflow lỗi sau khi shipment đã được tạo
 // (workflow phải rollback và không phát shipment.created).
@@ -123,12 +125,14 @@ medusaIntegrationTestRunner({
         const { admin, placePreparingOrder, shippedAt } = await setup()
         const { orderId, fulfillmentId } = await placePreparingOrder("Quận 7")
 
-        const res = await api.post(`/admin/orders/${orderId}/start-delivery`, {}, admin)
+        const res = await api.post(`/admin/orders/${orderId}/start-delivery`, DRIVER, admin)
         expect(res.status).toBe(200)
 
         await waitForStage(orderId, "SHIPPING")
         const metadata = await orderMetadata(orderId)
         const delivery = metadata.delivery
+        expect(delivery.driver_name).toBe(DRIVER.driver_name)
+        expect(delivery.plate).toBe(DRIVER.plate)
         expect(delivery.distance_km).toBe(3)
         expect(delivery.eta_at).toEqual(expect.any(String))
         // Quận 7: 3 km / 20 km/h = 9 phút.
@@ -142,7 +146,7 @@ medusaIntegrationTestRunner({
         ])
 
         // Bấm lần hai (đã giao đi rồi): 409, delivery không đổi.
-        const again = await api.post(`/admin/orders/${orderId}/start-delivery`, {}, admin).catch((e: any) => e.response)
+        const again = await api.post(`/admin/orders/${orderId}/start-delivery`, DRIVER, admin).catch((e: any) => e.response)
         expect(again.status).toBe(409)
         expect((await orderMetadata(orderId)).delivery).toEqual(delivery)
       })
@@ -151,7 +155,7 @@ medusaIntegrationTestRunner({
         const { admin, placePreparingOrder } = await setup()
         const { orderId } = await placePreparingOrder("Huyện Lạ")
 
-        const res = await api.post(`/admin/orders/${orderId}/start-delivery`, {}, admin)
+        const res = await api.post(`/admin/orders/${orderId}/start-delivery`, DRIVER, admin)
         expect(res.status).toBe(200)
         expect(res.data.delivery.distance_km).toBe(6)
       })
@@ -161,7 +165,7 @@ medusaIntegrationTestRunner({
         const orderId = await placeOrder("Quận 7")
         const before = await orderMetadata(orderId)
 
-        const res = await api.post(`/admin/orders/${orderId}/start-delivery`, {}, admin).catch((e: any) => e.response)
+        const res = await api.post(`/admin/orders/${orderId}/start-delivery`, DRIVER, admin).catch((e: any) => e.response)
         expect(res.status).toBe(409)
         expect(await orderMetadata(orderId)).toEqual(before)
         expect(before.delivery).toBeUndefined()
@@ -169,13 +173,25 @@ medusaIntegrationTestRunner({
 
       it("chưa đăng nhập 401, đơn không tồn tại 404", async () => {
         const { admin } = await setup()
-        const anonymous = await api.post("/admin/orders/order_x/start-delivery", {}).catch((e: any) => e.response)
+        const anonymous = await api.post("/admin/orders/order_x/start-delivery", DRIVER).catch((e: any) => e.response)
         expect(anonymous.status).toBe(401)
 
         const missing = await api
-          .post("/admin/orders/order_khong_ton_tai/start-delivery", {}, admin)
+          .post("/admin/orders/order_khong_ton_tai/start-delivery", DRIVER, admin)
           .catch((e: any) => e.response)
         expect(missing.status).toBe(404)
+      })
+
+      it("thiếu hoặc để trống tên tài xế, biển số: 400 và đơn không đổi", async () => {
+        const { admin, placePreparingOrder } = await setup()
+        const { orderId } = await placePreparingOrder("Quận 7")
+        const before = await orderMetadata(orderId)
+
+        for (const body of [{}, { driver_name: "Đức" }, { driver_name: "  ", plate: "59-X3 482.17" }]) {
+          const res = await api.post(`/admin/orders/${orderId}/start-delivery`, body, admin).catch((e: any) => e.response)
+          expect({ body, status: res.status }).toEqual({ body, status: 400 })
+        }
+        expect(await orderMetadata(orderId)).toEqual(before)
       })
 
       it("createOrderShipmentWorkflow lỗi: metadata.delivery khôi phục về giá trị cũ, stage vẫn PREPARING", async () => {
@@ -190,7 +206,7 @@ medusaIntegrationTestRunner({
           .updateOrders(orderId, { metadata: { ...current, delivery: previous } })
 
         failShipment = true
-        const res = await api.post(`/admin/orders/${orderId}/start-delivery`, {}, admin).catch((e: any) => e.response)
+        const res = await api.post(`/admin/orders/${orderId}/start-delivery`, DRIVER, admin).catch((e: any) => e.response)
         expect(res.status).toBeGreaterThanOrEqual(400)
 
         // Chờ một nhịp để chắc không có event shipment.created nào đến muộn.
@@ -202,7 +218,7 @@ medusaIntegrationTestRunner({
 
         // Tắt cờ thì thử lại được bình thường (khoá đã nhả, shipment chưa tạo).
         failShipment = false
-        const retry = await api.post(`/admin/orders/${orderId}/start-delivery`, {}, admin)
+        const retry = await api.post(`/admin/orders/${orderId}/start-delivery`, DRIVER, admin)
         expect(retry.status).toBe(200)
         await waitForStage(orderId, "SHIPPING")
         expect((await orderMetadata(orderId)).delivery.distance_km).toBe(3)

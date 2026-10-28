@@ -14,10 +14,12 @@ import {
 } from "@medusajs/medusa/core-flows"
 import { estimateDelivery } from "../lib/delivery/estimate"
 
-export type StartDeliveryInput = { order_id: string }
+export type StartDeliveryInput = { order_id: string; driver_name: string; plate: string }
 
-// Hình dạng `metadata.delivery` (API-7). Chưa có tên tài xế và biển số vì Admin chỉ bấm một nút.
+// Hình dạng `metadata.delivery` (API-7).
 export type OrderDelivery = {
+  driver_name: string
+  plate: string
   distance_km: number
   eta_at: string
   started_at: string
@@ -37,7 +39,9 @@ type OrderForDelivery = {
 
 // Kiểm tra đơn được phép bắt đầu giao, chọn fulfillment cần giao rồi tính ETA. Chưa ghi gì.
 // Đơn không ở PREPARING hoặc không còn fulfillment nào chưa giao thì ném CONFLICT (409).
-const planDeliveryStep = createStep("plan-delivery",async (order: OrderForDelivery) => {
+type PlanDeliveryInput = { order: OrderForDelivery; driver_name: string; plate: string }
+
+const planDeliveryStep = createStep("plan-delivery", async ({ order, driver_name, plate }: PlanDeliveryInput) => {
   const stage = order.metadata?.stage
   if (stage !== "PREPARING") {
     throw new MedusaError(
@@ -61,6 +65,8 @@ const planDeliveryStep = createStep("plan-delivery",async (order: OrderForDelive
   const startedAt = new Date()
   const { distanceKm, etaAt } = estimateDelivery(addressText, startedAt)
   const delivery: OrderDelivery = {
+    driver_name,
+    plate,
     distance_km: distanceKm,
     eta_at: etaAt.toISOString(),
     started_at: startedAt.toISOString(),
@@ -111,7 +117,7 @@ const setDeliveryMetadataStep = createStep(
 )
 
 /**
- * Admin bấm "Bắt đầu giao" trên đơn PREPARING: ghi `metadata.delivery` (ETA theo quận), rồi tạo shipment
+ * Admin bấm "Bắt đầu giao" trên đơn PREPARING: ghi `metadata.delivery` (tài xế, biển số, ETA theo quận), rồi tạo shipment
  * bằng workflow lõi của Medusa. `stage` sang SHIPPING do subscriber `shipment.created` (BE-6) đặt, không đặt ở đây.
  * Tạo shipment lỗi thì step ghi metadata được bù trừ, đơn trở lại như cũ.
  */
@@ -136,7 +142,13 @@ export const startDeliveryWorkflow = createWorkflow("start-delivery", (input: St
     options: { throwIfKeyNotFound: true },
   })
 
-  const plan = planDeliveryStep(transform({ orders }, ({ orders }) => orders[0] as OrderForDelivery))
+  const plan = planDeliveryStep(
+    transform({ orders, input }, ({ orders, input }) => ({
+      order: orders[0] as OrderForDelivery,
+      driver_name: input.driver_name,
+      plate: input.plate,
+    }))
+  )
 
   const delivery = setDeliveryMetadataStep(
     transform({ input, plan }, ({ input, plan }) => ({ order_id: input.order_id, delivery: plan.delivery }))
