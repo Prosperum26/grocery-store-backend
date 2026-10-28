@@ -14,7 +14,7 @@
 | Task | Nội dung | Ưu tiên | Phụ thuộc | Trạng thái |
 | :--- | :--- | :---: | :--- | :--- |
 | BE-1 | Region VND, kho Q.7, tắt dữ liệu mẫu áo quần | P0 | | [x] Xong · `1bd9761`, `d721719` |
-| BE-2 | Seed catalog thực phẩm + khách demo + đơn demo | P0 | BE-1 | [~] Một phần · catalog tạm 32 món `e73a9fc`, `f8ced2b`; chưa có khách/admin/đơn demo (BE-2c), chưa có ảnh (BE-2b); dự kiến thay catalog bằng `data/catalog_v2_updated.xlsx` |
+| BE-2 | Seed catalog thực phẩm + khách demo + đơn demo | P0 | BE-1 | [x] Xong · catalog v2 2.129 món `4791bd1`, `7cff854`; khách/admin/đơn demo `43b0265`. Ảnh sản phẩm (BE-2b) hoãn: thiếu ảnh hệ thống vẫn chạy, FE hiện ảnh giữ chỗ |
 | BE-3 | Tìm kiếm/lọc: `in_stock`, `on_sale_vnd`, đúng category | P0 | BE-2 | [x] Xong · `63e2ee5`, `0efdbef`, `f72353c` |
 | BE-4 | Khung giờ giao (`/store/delivery-slots`) + phí giao | P1 | BE-1 | [x] Xong · `241b090`, `8d54c17` (khác plan: phí cố định 15.000đ, slot không còn là shipping option) |
 | BE-5 | Thanh toán chỉ VNPAY (provider tạm) + mã `TUOI20` | P1 | BE-1 | [~] Một phần · VNPAY thật `84a51c7`, `3a67d5f`, `902aec8`; mã giảm giá `73c1d05`, `a23122c`; chưa thanh toán thử trên sandbox VNPAY |
@@ -292,5 +292,6 @@ Mọi route `/store/*` cần `x-publishable-api-key`; route của khách cần t
 
 | Ngày | Người | Đã xong | Dở dang / lưu ý |
 | :--- | :--- | :--- | :--- |
+| 2026-10-28 | | BE-2 xong: catalog v2 (2.129 món, 11 danh mục, 3 sản phẩm ẩn) và khách/admin/7 đơn demo (`43b0265`); integration 11 suite cũ pass (53 test) và seed-demo.spec pass khi chạy riêng | BE-2b (ảnh) hoãn; còn thử VNPAY sandbox, xem nút Bắt đầu giao trong Admin, BE-9 đến BE-12 |
 | 2026-10-28 | | BE-1, BE-3, BE-4, BE-6 xong; BE-2, BE-5, BE-7, BE-8 xong phần code (commit cuối `2c11113`) | Thanh toán và hoàn tiền thử trên sandbox VNPAY; xem nút "Bắt đầu giao" trong Admin; khách/đơn demo (BE-2c); BE-9 đến BE-12 chưa làm |
 | 2026-10-18 | | Chưa bắt đầu, mới có kế hoạch | |
