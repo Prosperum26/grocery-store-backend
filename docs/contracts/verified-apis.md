@@ -5,10 +5,10 @@ Script đã chạy nằm ở `docs/contracts/spikes/` (chạy bằng cách chép
 
 Ghi chú môi trường (ảnh hưởng mọi task):
 
-- **Windows:** script `test:*` trong `apps/backend/package.json` dùng cú pháp `TEST_TYPE=... jest`, `cmd.exe` không chạy được. Chạy qua Git Bash: `export npm_config_script_shell="C:\\Program Files\\Git\\bin\\bash.exe"` rồi `npm run test:... --workspace=@dtc/backend`. Đề xuất sửa lâu dài: thêm `cross-env` (chưa làm, ngoài phạm vi BE-0).
+- **Windows:** script `test:*` trong `apps/backend/package.json` ban đầu dùng cú pháp `TEST_TYPE=... jest`, `cmd.exe` không chạy được. **Đã sửa ở BE-12:** thêm `cross-env`, giờ `npm run test:... --workspace=@dtc/backend` chạy được từ PowerShell/cmd, không cần đặt `npm_config_script_shell`.
 - DB dev: container `com4fud-postgres` (pgvector/pgvector:pg16, cổng host 5434), DB `medusa-backend`. `.env` và `.env.test` đều gitignore; `.env.test.template` là bản không mật khẩu. Test runner tự tạo DB tạm theo `DB_*` trong `.env.test`.
 - `npx medusa db:migrate` trên DB trống **vẫn chạy** `src/migration-scripts/initial-data-seed.ts` (seed Europe/quần áo). BE-1 xoá file này.
-- Node v24.14.1 (đạt `^20.19.0 || >=22.12.0`), npm 11.11.0 (repo ghim 10.9.8; npm 11 làm đổi cờ `dev`→`devOptional` trong `package-lock.json`, đã hoàn tác, không commit).
+- Node v24.14.1 (đạt `^20.19.0 || >=22.12.0`). `package-lock.json` của commit khởi tạo ghi cờ `dev` cho khoảng 20 gói mà npm hiện tại (cả 10.9.8 repo ghim lẫn 11) tính là `devOptional`, nên `npm install` nào cũng làm lock thay đổi. **BE-12** commit lock do npm 10.9.8 sinh ra (chỉ đổi cờ, không đổi phiên bản gói) để hết thay đổi này. Cài gói mới thì dùng `npx npm@10.9.8 install ...`.
 
 ---
 
