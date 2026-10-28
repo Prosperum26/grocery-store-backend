@@ -43,6 +43,11 @@ export default defineMiddlewares({
       matcher: '/store/orders/:id/cancel',
       middlewares: [authenticate('customer', ['session', 'bearer'])],
     },
+    // Giỏ "Mua lại" (BE-9): cần khách đăng nhập, nếu không thì 401.
+    {
+      matcher: '/store/predictive/*',
+      middlewares: [authenticate('customer', ['session', 'bearer'])],
+    },
     // Order retrieve omits `metadata` (the list route has it); needed for metadata.stage.
     // Risk: this route is unauthenticated, anyone holding the order UUID can read it.
     {

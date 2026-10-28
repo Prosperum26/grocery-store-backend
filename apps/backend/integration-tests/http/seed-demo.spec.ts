@@ -4,26 +4,14 @@ import { bootstrapStore } from "../../src/lib/seed/bootstrap-store"
 import { seedCatalog } from "../../src/lib/seed/seed-catalog"
 import { seedDemo } from "../../src/lib/seed/seed-demo"
 import { seedPromotions } from "../../src/lib/seed/seed-promotions"
-import { CATALOG } from "../../src/lib/seed/seed-data/catalog"
-import { DEMO_DATA, DemoData } from "../../src/lib/seed/seed-data/demo"
+import { DEMO_DATA } from "../../src/lib/seed/seed-data/demo"
+import { withFixtureSkus } from "./_demo"
 import { waitFor } from "./_helpers"
 
 jest.setTimeout(300 * 1000)
 
 const PASSWORD = "Passw0rd!"
 const MINHTHU = "minhthu@com4fud.demo"
-
-// Test chạy trên bộ 32 món, nên thay sku catalog v2 của đơn demo bằng sku của bộ 32 món còn nhiều hàng.
-// Cùng một sku v2 luôn đổi sang cùng một sku, nên món lặp lại giữa các đơn vẫn lặp lại.
-function withFixtureSkus(data: DemoData): DemoData {
-  const pool = CATALOG.flatMap((p) => p.variants).filter((v) => v.stock >= 20).map((v) => v.sku)
-  const v2Skus = [...new Set(data.orders.flatMap((o) => o.items.map((i) => i.sku)))]
-  const map = new Map(v2Skus.map((sku, i) => [sku, pool[i % pool.length]]))
-  return {
-    ...data,
-    orders: data.orders.map((o) => ({ ...o, items: o.items.map((i) => ({ ...i, sku: map.get(i.sku)! })) })),
-  }
-}
 
 // Bước Medusa mà mỗi stage demo phải đã đi tới (fulfillment_status của đơn).
 const EXPECTED_FULFILLMENT: Record<string, string> = {
@@ -47,7 +35,7 @@ medusaIntegrationTestRunner({
         const store = await bootstrapStore(container)
         await seedCatalog(container, store)
         await seedPromotions(container, store)
-        const data = withFixtureSkus(DEMO_DATA)
+        const { data } = withFixtureSkus(DEMO_DATA)
 
         const first = await seedDemo(container, store, data, PASSWORD)
         expect(first).toEqual({ admin: true, customers: 2, orders: data.orders.length })
