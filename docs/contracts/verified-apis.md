@@ -187,7 +187,7 @@ Cho đơn tạo bằng `completeCart`: `query.graph({ entity: "order_cart", fiel
 - **Bù trừ:** step ghi metadata đọc lại metadata hiện tại rồi chỉ khôi phục khoá `delivery` (giá trị cũ, hoặc xoá khoá nếu trước đó chưa có), không đè `stage`. Kiểm đột biến: tắt compensation thì test "khôi phục" đỏ.
 - **Ép lỗi trong test mà không đụng code production:** đăng ký `createOrderShipmentWorkflow.hooks.shipmentCreated(...)` ở đầu file spec, ném lỗi khi cờ `failShipment` bật.
 - **ETA:** `estimateDelivery(address, startedAt)` trong `src/lib/delivery/estimate.ts`, bảng `DISTRICT_KM` ước lượng thủ công từ Kho Q.7 (O5), 20 km/h, `ceil` phút, mặc định 6 km. Quận được tìm trong chuỗi ghép `address_1, address_2, city, province`. Phép tính `km * 60 / 20` (nhân trước) để tránh `ceil(9.000000000000002)`.
-- **`metadata.delivery`** hiện gồm `distance_km`, `eta_at`, `started_at`, `notice_sent_at` (O2: chỉ ghi mốc, không gửi push). **Chưa có `driver_name`, `plate`** của API-7 vì widget chỉ có một nút.
+- **`metadata.delivery`** hiện gồm `distance_km`, `eta_at`, `started_at`, `notice_sent_at` (O2: chỉ ghi mốc, không gửi push). Bản đầu chưa có `driver_name`, `plate`; **đã bổ sung** (mục "BE-7 bổ sung" cuối file).
 - **Widget:** zone `order.details.side` có trong `admin-shared` (cùng `before`, `after`, `side.before`, `side.after`). Widget chỉ hiện khi `stage === "PREPARING"` hoặc đã có `delivery`.
 
 **Bằng chứng:** `src/lib/delivery/__tests__/estimate.unit.spec.ts` (7 test), `integration-tests/http/start-delivery.spec.ts` (5 test).
@@ -242,3 +242,66 @@ Tài liệu ghi sai độ dài một số cột (`vnp_ResponseCode` "[14]", `vnp
 **Chưa kiểm (cần sandbox thật):** gọi `merchant_webapi/api/transaction` với `VNPAY_TMN_CODE`/`VNPAY_HASH_SECRET` thật; `vnp_Amount` ×100 của refund; ô `vnp_TransactionNo` rỗng trong chuỗi ký; sandbox có bật hoàn tiền cho tài khoản không; chữ ký của response (ta chưa verify, chỉ đọc `vnp_ResponseCode`). Nếu VNPAY trả `97` (sai chữ ký), thử bỏ ô rỗng hoặc đổi `vnp_Amount` rồi ghi kết quả vào mục này.
 
 **Bằng chứng:** `src/modules/vnpay/__tests__/refund-client.unit.spec.ts` (10 test), `service.unit.spec.ts` (5 test refund), `integration-tests/http/customer-cancel.spec.ts` (6 test). Kiểm đột biến: bỏ lọc `customer_id` thì ca "người khác" nhận 200; bỏ `assertRefundedStep` thì ca refund lỗi nhận 200.
+
+## BE-2 — Catalog v2 (2.129 sản phẩm)
+
+**Kết quả đã chạy thật:**
+- **`require("./catalog-v2")` nạp nhầm file JSON.** Đặt `catalog-v2.ts` cạnh `catalog-v2.json` thì Node thử `.js`, `.json` trước các đuôi đăng ký thêm như `.ts`, nên `medusa exec` lấy object JSON và báo `loadCatalogV2 is not a function`. Đổi tên loader thành `load-catalog-v2.ts`. JSON đọc bằng `readFileSync` lúc chạy, không `import`, để `tsc` không phải suy kiểu cho file 1,4 MB.
+- **Sản phẩm ẩn dùng `ProductStatus.DRAFT`.** Store API và `/store/search` (route tự lọc `status = published`) không trả về, nhưng biến thể vẫn có `sku = catalog_id` để AI tra được. Sản phẩm draft vẫn có tồn kho và giá như thường.
+- **Seed chồng lên DB đã có catalog cũ bị lẫn dữ liệu:** seed bỏ qua theo handle và price list "Khuyến mãi tuần" chỉ tạo khi chưa có, nên DB cũ giữ 32 món mẫu và không có giá khuyến mãi của v2. Phải xoá DB rồi seed lại.
+- **Tạo theo lô 100 sản phẩm** (`createProductsWorkflow`, `createInventoryLevelsWorkflow` mỗi lô). 2.129 món mất khoảng 15 phút vì mỗi biến thể phát event cho search ingestion; trên DB mới index chưa active nên log có khoảng 12.700 dòng `not_found`, vô hại.
+- **Không pipe output của `medusa exec` qua `head`:** khi `head` thoát, tiến trình ghi log bị chặn và seed đứng giữa chừng (đã gặp, dừng ở 1.200 sản phẩm).
+
+**Quyết định:** 11 danh mục cha (8 cũ + `mi-an-lien`, `banh-keo-an-vat`, `dong-lanh-che-bien`), danh mục gốc ở `metadata.subcategory`; mỗi sản phẩm gắn một danh mục cha để FE vẫn đọc `categories[0]`. Nạp đủ 2.129 món, không xoá dòng trùng; `seedCatalog(container, ctx, catalog = DEMO_CATALOG)` nên integration test vẫn dùng 32 món. Combo hiện như sản phẩm thường, trừ CAT-000929 (trang gốc đã mất); bản trùng tên và quy cách thì ẩn, giữ bản AI tham chiếu.
+
+**Bằng chứng:** `tools/catalog/build_catalog_v2.py`, `tools/catalog/hidden-products.md`; seed trên DB dev: 2.129 sản phẩm, 2.126 published, 3 draft, 2.129 inventory level, 24 giá khuyến mãi.
+
+## BE-2c — Khách, admin, đơn demo
+
+**Kết quả đã chạy thật:**
+- **`createOrderWorkflow` không nhận `created_at`** (`CreateOrderDTO` không có trường này). Ngày đặt cũ của đơn demo chỉ nằm trong `metadata.stage_log`.
+- **Item không truyền `unit_price` thì workflow lấy giá đang tính của biến thể** (`calculated_price.calculated_amount`, gồm price list). Truyền `unit_price` thì thành giá tuỳ chỉnh (`isCustomPrice`). Kiểu `CreateOrderLineItemDTO` bắt buộc `unit_price` nên phải ép kiểu.
+- **`markPaymentCollectionAsPaid` chỉ dùng `pp_system_default`** (tạo session, authorize, capture). Provider không cần nằm trong region. Đơn demo vì vậy thanh toán qua provider hệ thống, huỷ đơn demo hoàn tiền qua provider đó.
+- **Fulfillment cần reservation** cho biến thể quản kho: `createReservationsWorkflow` với `line_item_id`, rồi `createOrderFulfillmentWorkflow` có `location_id`, `createOrderShipmentWorkflow`, `markOrderFulfillmentAsDeliveredWorkflow`. Đơn tạo bằng `createOrderWorkflow` có `shipping_methods` kèm `shipping_option_id` thì fulfillment chạy được.
+- **Ghi `metadata.stage` lúc tạo đơn:** subscriber BE-6 vẫn nhận event fulfillment/shipment/delivery nhưng bước chuyển bị từ chối (cùng stage hoặc lùi) và chỉ `logger.warn`.
+- **Khách:** `authService.register("emailpass")` rồi `createCustomerAccountWorkflow({ authIdentityId, customerData })` (workflow tự gắn `customer_id` vào auth identity), `createCustomerAddressesWorkflow`, `linkCustomersToCustomerGroupWorkflow`.
+- **Đọc trạng thái đơn:** `fulfillment_status`, `payment_status` là trường tính ra, `query.graph` trả `undefined`; Admin API `GET /admin/orders?fields=...` trả đủ. Store API `/store/customers/me` không trả `groups`.
+
+**Bằng chứng:** `integration-tests/http/seed-demo.spec.ts`; seed trên DB dev: 1 admin, 2 khách, 7 đơn đúng stage.
+
+## BE-7 bổ sung — Tài xế và biển số
+
+- `POST /admin/orders/:id/start-delivery` nhận body `{ driver_name, plate }` (zod, cắt khoảng trắng, 1–100 và 1–20 ký tự) qua `validateAndTransformBody` trong `middlewares.ts`; thiếu hoặc rỗng trả 400 và đơn không đổi. `metadata.delivery` đủ 6 trường của API-7.
+- Đã kiểm trên trình duyệt (đơn #6 và #7 của DB dev): ETA = `started_at` + 9 phút cho Quận 7, widget hiện tài xế và biển số.
+
+**Bằng chứng:** `integration-tests/http/start-delivery.spec.ts` (6 test).
+
+## BE-9 — Giỏ "Mua lại" (bản tạm)
+
+- **Số lượng dòng đơn** đọc ở `items.detail.quantity` (như S7).
+- **Giá có khuyến mãi qua query:** `product_variant` với `calculated_price.calculated_amount` và `context: { calculated_price: QueryContext({ currency_code: "vnd" }) }`, không cần region.
+- **Tồn khả dụng theo biến thể:** helper của chỉ mục tìm kiếm trả theo sản phẩm, không kèm id biến thể, nên tách `availableOf` riêng (`src/lib/inventory/available.ts`), dùng chung với BE-11.
+- Middleware `authenticate("customer", ["session","bearer"])` cho `/store/predictive/*`; chưa đăng nhập trả 401.
+
+**Bằng chứng:** `src/lib/predictive/__tests__/reorder.unit.spec.ts` (7 test), `integration-tests/http/reorder-basket.spec.ts`.
+
+## BE-10 — Hợp đồng Trợ lý Bếp
+
+- `recipes_v2.json` của nhóm AI có hai nguyên liệu cùng trỏ về một sản phẩm (`rau om`, `ngò gai` → CAT-001087) và `raw_text` gộp nhiều nguyên liệu; hợp đồng quy định mỗi biến thể chỉ một dòng.
+- Route giữ chỗ kiểm body bằng zod rồi trả `501 { code: "IN_DEVELOPMENT" }`; `role: "system"` trong `history` bị từ chối.
+
+**Bằng chứng:** `docs/contracts/assistant-recipes.md`, `integration-tests/http/assistant.spec.ts`.
+
+## BE-11 — Admin
+
+- **Màu:** biến CSS cứng trong `@medusajs/dashboard/dist/app.css` (ví dụ `--bg-interactive: rgba(59, 130, 246, 1)`); `admin-bundler` sinh lại `.medusa/client/index.css` mỗi lần build, file này chỉ import CSS dashboard và Tailwind. Không có cấu hình màu (khẳng định S6). Nhóm chọn chỉ dùng màu Com4Fud trong widget của mình.
+- **Ngôn ngữ:** i18next đọc localStorage `lng`, `fallbackLng: "en"`; không đặt mặc định từ server được. `vi.json` thiếu nhóm `layout` (các nút tuỳ chỉnh bố cục); đã bổ sung trong `src/admin/i18n/index.ts` theo dạng `{ vi: { translation: { layout: {...} } } }` và thấy hiện tiếng Việt.
+- **Thứ tự widget:** trang danh sách (Đơn hàng, Tồn kho) dùng `LayoutComposer`: phần tử chính được thêm trước, widget nối sau, mọi phần tử có thứ tự 0, nên widget `*.list.before` nằm **dưới** bảng. Người dùng kéo thả ở "Tuỳ chỉnh trang"; bố cục lưu phía server qua `sdk.admin.layouts` (của tôi / mặc định cho mọi người).
+- **Zone có sẵn:** `order.list.before`, `inventory_item.list.before`, `product.list.before`… (danh sách đầy đủ trong `admin-shared`).
+
+**Bằng chứng:** `src/lib/dashboard/__tests__/summary.unit.spec.ts` (4 test), `integration-tests/http/dashboard.spec.ts`; đã kiểm trên trình duyệt 29/10.
+
+## BE-12 — Dọn dẹp
+
+- **Lockfile:** `package-lock.json` của commit khởi tạo ghi `dev` cho khoảng 20 gói (`typescript`, `@swc/core`, `@types/react`, `yalc`…) mà npm 10.9.8 (bản repo ghim) và npm 11 đều tính là `devOptional`. Đã commit lock do npm 10.9.8 sinh ra, chỉ đổi cờ, không đổi phiên bản gói.
+- **`cross-env`** làm script `test:*` chạy được từ PowerShell/cmd; đã chạy đủ 15 suite integration từ PowerShell mà không đặt `npm_config_script_shell`.
