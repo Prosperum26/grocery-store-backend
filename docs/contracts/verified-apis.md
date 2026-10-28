@@ -176,3 +176,18 @@ Cho đơn tạo bằng `completeCart`: `query.graph({ entity: "order_cart", fiel
 - **Backfill:** `npx medusa exec ./src/scripts/backfill-order-stage.ts` (logic ở `backfillOrderStages`); chỉ đụng đơn chưa có `metadata.stage`, ghi `stage_log: [{ stage, at, by: "backfill" }]`, dùng `Modules.ORDER` `updateOrders(id, { metadata })`.
 
 **Bằng chứng:** `src/lib/order-stage/__tests__/stages.unit.spec.ts` (7 test, gồm ma trận 7×6), `integration-tests/http/order-stage.spec.ts` (5 test).
+
+## BE-7 — Bắt đầu giao, ETA, widget Admin
+
+**Kết quả đã chạy thật:**
+- **Stage không do workflow đặt.** `startDeliveryWorkflow` chỉ ghi `metadata.delivery` rồi chạy `createOrderShipmentWorkflow.runAsStep`; `shipment.created` đã có subscriber BE-6 đưa đơn sang SHIPPING (test chờ bằng `waitForStage`). Event của `emitEventStep` chỉ phát khi workflow thành công, nên shipment lỗi thì không có `shipment.created` và stage giữ PREPARING.
+- **409 cho đơn sai stage:** `MedusaError.Types.CONFLICT` (khác `INVALID_DATA` = 400 của `setOrderStageWorkflow`). Đơn lạ 404 nhờ `throwIfKeyNotFound`, chưa đăng nhập 401 (core).
+- **Chống bấm hai lần:** workflow chọn fulfillment có `shipped_at` rỗng; lần hai không còn fulfillment nào nên 409 dù stage chưa kịp đổi (subscriber bất đồng bộ). Thêm khoá `start-delivery-<order_id>` cho hai request đồng thời.
+- **Query chạy được:** `order` với `shipping_address.*`, `fulfillments.{id,shipped_at,canceled_at}`, `fulfillments.items.{line_item_id,quantity}`. Shipment chỉ giao các dòng của fulfillment được chọn (input theo S7: `items: [{ id, quantity }]`).
+- **Bù trừ:** step ghi metadata đọc lại metadata hiện tại rồi chỉ khôi phục khoá `delivery` (giá trị cũ, hoặc xoá khoá nếu trước đó chưa có), không đè `stage`. Kiểm đột biến: tắt compensation thì test "khôi phục" đỏ.
+- **Ép lỗi trong test mà không đụng code production:** đăng ký `createOrderShipmentWorkflow.hooks.shipmentCreated(...)` ở đầu file spec, ném lỗi khi cờ `failShipment` bật.
+- **ETA:** `estimateDelivery(address, startedAt)` trong `src/lib/delivery/estimate.ts`, bảng `DISTRICT_KM` ước lượng thủ công từ Kho Q.7 (O5), 20 km/h, `ceil` phút, mặc định 6 km. Quận được tìm trong chuỗi ghép `address_1, address_2, city, province`. Phép tính `km * 60 / 20` (nhân trước) để tránh `ceil(9.000000000000002)`.
+- **`metadata.delivery`** hiện gồm `distance_km`, `eta_at`, `started_at`, `notice_sent_at` (O2: chỉ ghi mốc, không gửi push). **Chưa có `driver_name`, `plate`** của API-7 vì widget chỉ có một nút.
+- **Widget:** zone `order.details.side` có trong `admin-shared` (cùng `before`, `after`, `side.before`, `side.after`). Widget chỉ hiện khi `stage === "PREPARING"` hoặc đã có `delivery`.
+
+**Bằng chứng:** `src/lib/delivery/__tests__/estimate.unit.spec.ts` (7 test), `integration-tests/http/start-delivery.spec.ts` (5 test).
