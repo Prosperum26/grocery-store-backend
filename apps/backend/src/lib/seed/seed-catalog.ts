@@ -6,10 +6,12 @@ import {
   createProductCategoriesWorkflow,
   createProductsWorkflow,
 } from "@medusajs/medusa/core-flows"
-import { CATALOG, CATEGORIES } from "./seed-data/catalog"
+import { CatalogVariant, DEMO_CATALOG, SeedCatalogData } from "./seed-data/catalog"
 
 const OPTION_TITLE = "Quy cách"
 const PRICE_LIST_TITLE = "Khuyến mãi tuần"
+// Tạo sản phẩm và tồn kho theo lô, để catalog 2.129 món không dồn vào một workflow quá lớn.
+const BATCH_SIZE = 100
 
 export type CatalogContext = {
   regionId: string
@@ -21,17 +23,19 @@ export type CatalogContext = {
  * Seed danh mục, sản phẩm, tồn kho tại Kho Q.7 và price list khuyến mãi.
  * Idempotent theo `handle`: sản phẩm đã có thì bỏ qua (không sửa lại giá/tồn).
  * Giá VND là số nguyên đồng.
+ * `catalog` mặc định là bộ 32 món dùng cho test; `npm run seed` truyền catalog v2 (loadCatalogV2).
  */
 export async function seedCatalog(
   container: MedusaContainer,
-  ctx: CatalogContext
+  ctx: CatalogContext,
+  catalog: SeedCatalogData = DEMO_CATALOG
 ): Promise<{ created: number; skipped: number }> {
   const query = container.resolve(ContainerRegistrationKeys.QUERY)
 
   // 1. Danh mục: tạo cái còn thiếu theo handle
   const { data: existingCats } = await query.graph({ entity: "product_category", fields: ["id", "handle"] })
   const categoryIds = new Map<string, string>(existingCats.map((c: any) => [c.handle, c.id]))
-  const missingCats = CATEGORIES.filter((c) => !categoryIds.has(c.handle))
+  const missingCats = catalog.categories.filter((c) => !categoryIds.has(c.handle))
   if (missingCats.length) {
     const { result } = await createProductCategoriesWorkflow(container).run({
       input: { product_categories: missingCats.map((c) => ({ name: c.name, handle: c.handle, is_active: true })) },
@@ -42,8 +46,8 @@ export async function seedCatalog(
   // 2. Sản phẩm mới (chưa có handle)
   const { data: existingProducts } = await query.graph({ entity: "product", fields: ["handle"] })
   const existingHandles = new Set(existingProducts.map((p: any) => p.handle))
-  const toCreate = CATALOG.filter((p) => !existingHandles.has(p.handle))
-  const skipped = CATALOG.length - toCreate.length
+  const toCreate = catalog.products.filter((p) => !existingHandles.has(p.handle))
+  const skipped = catalog.products.length - toCreate.length
   if (!toCreate.length) {
     return { created: 0, skipped }
   }
@@ -55,49 +59,58 @@ export async function seedCatalog(
     throw new Error("Chưa có shipping profile; chạy bootstrapStore trước seedCatalog.")
   }
 
-  await createProductsWorkflow(container).run({
-    input: {
-      products: toCreate.map((p) => ({
-        title: p.title,
-        handle: p.handle,
-        description: p.description,
-        status: ProductStatus.PUBLISHED,
-        category_ids: [categoryIds.get(p.categoryHandle)!],
-        shipping_profile_id: shippingProfileId,
-        sales_channels: [{ id: ctx.salesChannelId }],
-        metadata: p.metadata,
-        options: [{ title: OPTION_TITLE, values: p.variants.map((v) => v.title) }],
-        variants: p.variants.map((v) => ({
-          title: v.title,
-          sku: v.sku,
-          manage_inventory: true,
-          weight: v.weightGrams,
-          options: { [OPTION_TITLE]: v.title },
-          metadata: { is_default: v.isDefault === true },
-          prices: [{ amount: v.priceVnd, currency_code: "vnd" }],
+  // 3. Mỗi lô: tạo sản phẩm, rồi tra biến thể vừa tạo theo sku và đặt tồn tại Kho Q.7.
+  const variants: (CatalogVariant & { productHandle: string })[] = []
+  const bySku = new Map<string, any>()
+  for (let start = 0; start < toCreate.length; start += BATCH_SIZE) {
+    const batch = toCreate.slice(start, start + BATCH_SIZE)
+
+    await createProductsWorkflow(container).run({
+      input: {
+        products: batch.map((p) => ({
+          title: p.title,
+          handle: p.handle,
+          description: p.description,
+          // Sản phẩm ẩn (combo, bản trùng) vẫn nằm trong DB để AI tra theo sku, nhưng là draft
+          // nên Store API và /store/search (chỉ lấy published) không trả về.
+          status: p.status === "draft" ? ProductStatus.DRAFT : ProductStatus.PUBLISHED,
+          category_ids: [categoryIds.get(p.categoryHandle)!],
+          shipping_profile_id: shippingProfileId,
+          sales_channels: [{ id: ctx.salesChannelId }],
+          metadata: p.metadata,
+          options: [{ title: OPTION_TITLE, values: p.variants.map((v) => v.title) }],
+          variants: p.variants.map((v) => ({
+            title: v.title,
+            sku: v.sku,
+            manage_inventory: true,
+            weight: v.weightGrams,
+            options: { [OPTION_TITLE]: v.title },
+            metadata: { is_default: v.isDefault === true },
+            prices: [{ amount: v.priceVnd, currency_code: "vnd" }],
+          })),
         })),
-      })),
-    },
-  })
+      },
+    })
 
-  // 3. Tồn kho tại Kho Q.7: tra id biến thể và inventory item theo sku
-  const variants = toCreate.flatMap((p) => p.variants.map((v) => ({ ...v, productHandle: p.handle })))
-  const { data: createdVariants } = await query.graph({
-    entity: "product_variant",
-    fields: ["id", "sku", "product.handle", "inventory_items.inventory_item_id"],
-    filters: { sku: variants.map((v) => v.sku) },
-  })
-  const bySku = new Map<string, any>(createdVariants.map((v: any) => [v.sku, v]))
+    const batchVariants = batch.flatMap((p) => p.variants.map((v) => ({ ...v, productHandle: p.handle })))
+    const { data: createdVariants } = await query.graph({
+      entity: "product_variant",
+      fields: ["id", "sku", "product.handle", "inventory_items.inventory_item_id"],
+      filters: { sku: batchVariants.map((v) => v.sku) },
+    })
+    createdVariants.forEach((v: any) => bySku.set(v.sku, v))
 
-  await createInventoryLevelsWorkflow(container).run({
-    input: {
-      inventory_levels: variants.map((v) => ({
-        inventory_item_id: bySku.get(v.sku).inventory_items[0].inventory_item_id,
-        location_id: ctx.stockLocationId,
-        stocked_quantity: v.stock,
-      })),
-    },
-  })
+    await createInventoryLevelsWorkflow(container).run({
+      input: {
+        inventory_levels: batchVariants.map((v) => ({
+          inventory_item_id: bySku.get(v.sku).inventory_items[0].inventory_item_id,
+          location_id: ctx.stockLocationId,
+          stocked_quantity: v.stock,
+        })),
+      },
+    })
+    variants.push(...batchVariants)
+  }
 
   // 4. Price list khuyến mãi cho biến thể có salePriceVnd
   const { data: existingLists } = await query.graph({

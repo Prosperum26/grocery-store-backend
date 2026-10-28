@@ -19,7 +19,7 @@ export type CatalogVariant = {
   sku: string
   priceVnd: number // giá niêm yết, số nguyên đồng
   salePriceVnd?: number // có thì vào price list "Khuyến mãi tuần"
-  weightGrams: number
+  weightGrams?: number // không có với đơn vị đếm (hộp, trái...)
   stock: number
   isDefault?: boolean
 }
@@ -27,9 +27,10 @@ export type CatalogVariant = {
 export type CatalogProduct = {
   handle: string
   title: string
-  categoryHandle: CategoryHandle
+  categoryHandle: string // một trong `categories` của bộ catalog chứa nó
   description: string
-  image: string // tên file trong seed-data/images (BE-2b)
+  image?: string // tên file trong seed-data/images (BE-2b)
+  status?: "published" | "draft" // draft: có trong DB nhưng storefront và tìm kiếm không thấy
   metadata: {
     art?: string
     tint?: Tint
@@ -38,8 +39,21 @@ export type CatalogProduct = {
     low_stock: number
     prep_options?: string[]
     companions?: string[] // handle sản phẩm thường mua kèm
+    // Chỉ có ở catalog v2 (xem tools/catalog/build_catalog_v2.py)
+    catalog_id?: string // mã AI dùng để tra sản phẩm, trùng với sku
+    subcategory?: string // danh mục gốc trong file xlsx
+    source?: string
+    needs_review?: boolean
+    hidden_reason?: "combo" | "duplicate"
+    duplicate_of?: string // catalog_id của bản đang hiện
   }
   variants: CatalogVariant[]
+}
+
+// Một bộ catalog để seed: danh mục cha và sản phẩm.
+export type SeedCatalogData = {
+  categories: { handle: string; name: string }[]
+  products: CatalogProduct[]
 }
 
 export const CATEGORIES: { handle: CategoryHandle; name: string }[] = [
@@ -227,3 +241,6 @@ export const CATALOG: CatalogProduct[] = [
       metadata: { art: "coffee", tint: "brown", stock_unit: "lốc", low_stock: 10 } },
     { title: "Lốc 6 lon", sku: "DU-0704", priceVnd: 48000, weightGrams: 1100, stock: 8 }),
 ]
+
+// Bộ 32 món ở trên: dùng cho integration test (mặc định của seedCatalog).
+export const DEMO_CATALOG: SeedCatalogData = { categories: CATEGORIES, products: CATALOG }

@@ -168,6 +168,20 @@ Lưu ý:
   npm run seed --workspace=@dtc/backend   # chạy từ gốc repo
   ```
 - Medusa tự tạo "Medusa Store", "Default Sales Channel" và một publishable key khi khởi động; seed dùng lại các thứ này (đặt tiền tệ mặc định VND) thay vì tạo trùng.
+- Publishable key gắn với từng DB: sau mỗi lần xoá và tạo lại DB, chép key mới (dòng `Publishable key:` khi seed) vào `NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY` trong `.env.local` của storefront rồi chạy lại `yarn dev`.
+
+### Catalog
+
+`npm run seed` nạp **catalog v2**: 2.129 sản phẩm, 11 danh mục (`apps/backend/src/lib/seed/seed-data/catalog-v2.json`). Integration test vẫn dùng bộ 32 món trong `seed-data/catalog.ts` (mặc định của `seedCatalog`).
+
+- **DB đã seed catalog cũ (32 món) phải xoá và seed lại** theo lệnh ở trên. Seed bỏ qua sản phẩm đã có theo handle và chỉ tạo price list "Khuyến mãi tuần" khi chưa có, nên seed chồng lên DB cũ sẽ còn 32 món cũ và thiếu giá khuyến mãi của catalog v2. Sửa giá, tên hay ẩn/hiện của sản phẩm đã seed cũng cần seed lại trên DB mới.
+- Seed 2.129 món mất khoảng 15 phút. Log có nhiều dòng `not_found` của search ingestion: index tìm kiếm chưa có version active nên bỏ qua event; khởi động app (`npm run backend:dev`) một lần thì index tự nạp đủ.
+- JSON sinh từ `catalog_v2_updated.xlsx` (thư mục `data/` của nhóm, ngoài repo). Sửa dữ liệu thì sửa xlsx rồi chạy (Python 3.11+, `pandas`, `openpyxl`):
+  ```bash
+  python tools/catalog/build_catalog_v2.py <đường dẫn>/catalog_v2_updated.xlsx [thư mục chứa recipes_v2.json]
+  ```
+  Script in báo cáo (dòng bị ẩn, đổi tên, giá nghi sai, thiếu quy cách) và sinh lại `tools/catalog/hidden-products.md`. Quy tắc ánh xạ danh mục, ẩn sản phẩm, tồn kho và giá khuyến mãi ở docstring đầu script.
+- Sản phẩm có `note_2` trong xlsx hoặc trùng tên và quy cách với sản phẩm khác được seed với `status = draft`: vẫn có trong DB (`sku = catalog_id`, để AI tra được) nhưng storefront và tìm kiếm không thấy.
 
 ## Thanh toán VNPAY (sandbox)
 

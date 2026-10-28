@@ -1,6 +1,7 @@
 import { ExecArgs } from "@medusajs/framework/types"
 import { bootstrapStore } from "../lib/seed/bootstrap-store"
 import { seedCatalog } from "../lib/seed/seed-catalog"
+import { loadCatalogV2 } from "../lib/seed/seed-data/load-catalog-v2"
 import { seedPromotions } from "../lib/seed/seed-promotions"
 
 // Chạy: npm run seed --workspace=@dtc/backend. Idempotent, chạy lại an toàn.
@@ -12,7 +13,8 @@ export default async function seed({ container }: ExecArgs) {
   console.log("Shipping option:", store.shippingOptionId)
   console.log("Publishable key:", store.publishableKey)
 
-  const catalog = await seedCatalog(container, store)
+  // Catalog thật 2.129 món (BE-2). Test vẫn dùng bộ 32 món mặc định của seedCatalog.
+  const catalog = await seedCatalog(container, store, loadCatalogV2())
   console.log(`Catalog: created ${catalog.created}, skipped ${catalog.skipped}`)
 
   await seedPromotions(container, store)
