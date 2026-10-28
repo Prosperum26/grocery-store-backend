@@ -17,7 +17,7 @@ const DEFAULT_IP_ADDR = "127.0.0.1"
 const VN_OFFSET_MS = 7 * 60 * 60 * 1000
 
 /** Mốc ms UTC -> "yyyyMMddHHmmss" theo giờ VN. */
-function formatVnpDate(ms: number): string {
+export function formatVnpDate(ms: number): string {
   return new Date(ms + VN_OFFSET_MS).toISOString().replace(/\D/g, "").slice(0, 14)
 }
 

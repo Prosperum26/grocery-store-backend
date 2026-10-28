@@ -37,6 +37,12 @@ export default defineMiddlewares({
       matcher: '/store/customers/me/vouchers',
       middlewares: [authenticate('customer', ['session', 'bearer'])],
     },
+    // Khách huỷ đơn của mình (BE-8): cần đăng nhập, nếu không thì 401. Route tự kiểm quyền sở hữu đơn.
+    {
+      method: ['POST'],
+      matcher: '/store/orders/:id/cancel',
+      middlewares: [authenticate('customer', ['session', 'bearer'])],
+    },
     // Order retrieve omits `metadata` (the list route has it); needed for metadata.stage.
     // Risk: this route is unauthenticated, anyone holding the order UUID can read it.
     {

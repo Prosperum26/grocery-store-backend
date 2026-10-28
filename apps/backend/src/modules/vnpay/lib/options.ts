@@ -12,5 +12,6 @@ export function vnpayOptionsFromEnv(env: NodeJS.ProcessEnv = process.env): Vnpay
     payUrl: env.VNPAY_PAY_URL || "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html",
     returnUrl: env.VNPAY_RETURN_URL || "http://localhost:8000/checkout/vnpay-return",
     ipAddr: env.VNPAY_IP_ADDR || undefined,
+    apiUrl: env.VNPAY_API_URL || undefined,
   }
 }

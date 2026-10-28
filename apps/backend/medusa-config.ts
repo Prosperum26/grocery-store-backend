@@ -28,6 +28,7 @@ module.exports = defineConfig({
               payUrl: process.env.VNPAY_PAY_URL || 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html',
               returnUrl: process.env.VNPAY_RETURN_URL || 'http://localhost:8000/checkout/vnpay-return',
               ipAddr: process.env.VNPAY_IP_ADDR || undefined,
+              apiUrl: process.env.VNPAY_API_URL || undefined,
             },
           },
         ],

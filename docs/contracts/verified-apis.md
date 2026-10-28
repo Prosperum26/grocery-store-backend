@@ -191,3 +191,54 @@ Cho đơn tạo bằng `completeCart`: `query.graph({ entity: "order_cart", fiel
 - **Widget:** zone `order.details.side` có trong `admin-shared` (cùng `before`, `after`, `side.before`, `side.after`). Widget chỉ hiện khi `stage === "PREPARING"` hoặc đã có `delivery`.
 
 **Bằng chứng:** `src/lib/delivery/__tests__/estimate.unit.spec.ts` (7 test), `integration-tests/http/start-delivery.spec.ts` (5 test).
+
+## BE-8 — API hoàn tiền VNPAY (đọc tài liệu sandbox)
+
+**Nguồn:** `https://sandbox.vnpayment.vn/apis/docs/truy-van-hoan-tien/querydr&refund.html` ("API truy vấn (querydr) và hoàn tiền (refund) giao dịch"; link lấy từ trang `docs/thanh-toan-pay/pay.html`, mục lục `/apis/` không liệt kê). Trang cũ `docs/hoantien/refund.html` vẫn 404. Thuật toán băm: `docs/chuyen-doi-thuat-toan/changeTypeHash.html`. Đọc ngày 2026-10-28; **chưa gọi thử sandbox thật** (cần `VNPAY_TMN_CODE`/`VNPAY_HASH_SECRET` thật).
+
+**Endpoint:** `POST https://sandbox.vnpayment.vn/merchant_webapi/api/transaction`, `Content-Type: application/json`, body JSON phẳng.
+
+**Tham số request** (tất cả bắt buộc trừ `vnp_TransactionNo`):
+
+| Tham số | Kiểu | Ghi chú |
+| :--- | :--- | :--- |
+| `vnp_RequestId` | chữ-số [1,32] | Mã yêu cầu hoàn do merchant sinh, **không trùng trong ngày** |
+| `vnp_Version` | [1,8] | `2.1.0` |
+| `vnp_Command` | [1,16] | `refund` |
+| `vnp_TmnCode` | [8] | Mã merchant |
+| `vnp_TransactionType` | số | `02` hoàn toàn phần, `03` hoàn một phần |
+| `vnp_TxnRef` | [1,100] | Mã giao dịch của merchant gửi lúc thanh toán (`txn_ref` của ta) |
+| `vnp_Amount` | số [1,12] | Số tiền hoàn, ≤ số tiền giao dịch gốc (tài liệu không ghi ×100 riêng cho refund; ta dùng ×100 như `pay`, **chưa kiểm**) |
+| `vnp_OrderInfo` | [1,255] | Mô tả lý do hoàn |
+| `vnp_TransactionNo` | số [1,15] | Tuỳ chọn: mã giao dịch VNPAY của lần thanh toán gốc (`vnp_TransactionNo` trong IPN) |
+| `vnp_TransactionDate` | 14 số | `yyyyMMddHHmmss` GMT+7, **bằng `vnp_CreateDate` của request `pay` gốc** (không phải `vnp_PayDate`) |
+| `vnp_CreateBy` | [1,245] | Tên người tạo yêu cầu hoàn |
+| `vnp_CreateDate` | 14 số | Thời điểm tạo yêu cầu hoàn, GMT+7 |
+| `vnp_IpAddr` | [7,45] | IP máy chủ gọi API |
+| `vnp_SecureHash` | [32,256] | Chữ ký |
+
+**Cách ký request:** nối giá trị (không có tên khoá) bằng ký tự `|` theo đúng thứ tự
+`vnp_RequestId | vnp_Version | vnp_Command | vnp_TmnCode | vnp_TransactionType | vnp_TxnRef | vnp_Amount | vnp_TransactionNo | vnp_TransactionDate | vnp_CreateBy | vnp_CreateDate | vnp_IpAddr | vnp_OrderInfo`,
+rồi `HMAC-SHA512(hashSecret, chuỗi)` ra hex chữ thường (v2.1.0 dùng HMACSHA512; mẫu code UTF-8, hex thường). **Khác** chữ ký của `pay` (đó là `key=value` sắp xếp, nối `&`, mã hoá URL). Trang không nói giá trị rỗng của `vnp_TransactionNo` xử lý ra sao; ta giữ ô rỗng giữa hai dấu `|`.
+
+**Response:** `vnp_ResponseId`, `vnp_Command`, `vnp_TmnCode`, `vnp_TxnRef`, `vnp_Amount`, `vnp_OrderInfo`, `vnp_ResponseCode`, `vnp_Message`, `vnp_BankCode`, `vnp_PayDate`, `vnp_TransactionNo` (mã giao dịch hoàn của VNPAY), `vnp_TransactionType`, `vnp_TransactionStatus`, `vnp_SecureHash`. Chuỗi ký response (cũng nối `|`):
+`vnp_ResponseId | vnp_Command | vnp_ResponseCode | vnp_Message | vnp_TmnCode | vnp_TxnRef | vnp_Amount | vnp_BankCode | vnp_PayDate | vnp_TransactionNo | vnp_TransactionType | vnp_TransactionStatus | vnp_OrderInfo`.
+Tài liệu ghi sai độ dài một số cột (`vnp_ResponseCode` "[14]", `vnp_OrderInfo` "[2]").
+
+**`vnp_ResponseCode`:** `00` thành công; `02` mã merchant sai; `03` sai định dạng dữ liệu; `91` không tìm thấy giao dịch cần hoàn; `94` đã gửi yêu cầu hoàn cho giao dịch này và VNPAY đang xử lý; `95` giao dịch gốc thất bại bên VNPAY nên từ chối hoàn; `97` sai chữ ký; `99` lỗi khác.
+**`vnp_TransactionStatus`** (có thể gặp ở response hoàn): `05` VNPAY đang xử lý hoàn, `06` đã gửi yêu cầu hoàn sang ngân hàng, `09` từ chối hoàn.
+**Giới hạn:** tài liệu không nêu thời hạn hoàn; thư viện `vnpay.js.org` ghi hoàn tiền bị VNPAY giới hạn trên sandbox (cần liên hệ VNPAY mở), nên có thể sandbox thật báo lỗi dù code đúng.
+
+**Kết quả đã chạy thật (khách huỷ đơn, `POST /store/orders/:id/cancel`):**
+- **`refundPaymentsStep` của Medusa 2.21.1 NUỐT lỗi của provider** (`core-flows/dist/payment/steps/refund-payments.js`: `.catch` chỉ `logger.error("Error was thrown trying to cancel payment ...")`). Hệ quả: `cancelOrderWorkflow` vẫn huỷ đơn, xoá reservation, phát `order.canceled` dù `refundPayment` ném lỗi, tức đơn huỷ mà tiền chưa hoàn. Đã chứng minh: spy `SystemPaymentProvider.prototype.refundPayment` ném lỗi thì route (bản chỉ gọi `cancelOrderWorkflow`) vẫn trả 200. Ném `MedusaError` trong provider (D4) vì vậy **không đủ để dừng việc huỷ**.
+- **Cách xử lý:** `customerCancelOrderWorkflow` tự tính phần còn phải hoàn (`captures − refunds` của từng payment), chạy `refundPaymentsWorkflow` (public; `refundCapturedPaymentsWorkflow` không được export), rồi `assertRefundedStep` đọc lại dữ liệu, còn payment chưa hoàn hết thì ném `MedusaError(UNEXPECTED_STATE, ..., "REFUND_FAILED")` **trước** `cancelOrderWorkflow`. Gọi lại sau khi hoàn đã xong thì phần còn phải hoàn bằng 0, không hoàn hai lần. Hạn chế: đơn có nhiều payment mà chỉ một cái hoàn thất bại thì cái kia vẫn đã hoàn (hiện mỗi đơn một payment).
+- **Phân loại lỗi trong route:** `run({ throwOnError: false })` trả `errors: [{ action, handlerType, error }]`; `action` là id step lỗi (`validate-order-cancellable`, `use-query-graph-step`) và `error.code` giữ nguyên mã ta gắn. Route trả `409 { code: "ORDER_NOT_CANCELLABLE" }` (sai stage, đã huỷ, còn fulfillment chưa huỷ), `502 { code: "REFUND_FAILED" }`, còn lại ném tiếp (đơn lạ 404). CONFLICT bị error handler ghi đè `code` (BE-4) nên route tự trả JSON.
+- **404 cho đơn của người khác:** query `order` lọc theo cả `id` và `customer_id` với `throwIfKeyNotFound`, không lộ việc đơn có tồn tại. Chưa đăng nhập 401 nhờ `authenticate("customer", ["session","bearer"])`.
+- **Stage:** workflow không đặt `CANCELLED`; subscriber `order.canceled` (BE-6) đặt, nên response `200 { order: { id, status: "canceled" } }` chưa chắc đã có `metadata.stage = CANCELLED`, storefront đọc lại đơn. Khoá `order-stage-<id>` dùng chung với `setOrderStageWorkflow` để Admin xác nhận không xen vào giữa lúc kiểm stage và huỷ.
+- **Còn fulfillment chưa huỷ:** `cancelOrderWorkflow` tự ném `NOT_ALLOWED` (400); ta kiểm trước để trả 409. Test dựng tình huống lệch bằng cách đưa `metadata.stage` về PENDING sau khi tạo fulfillment.
+- **Test hoàn tiền không dùng VNPAY:** payment `pp_system_default` rồi `capturePaymentWorkflow`; provider nằm trong container riêng của payment module nên không `container.resolve("pp_system_default")` được, phải spy trên prototype của `SystemPaymentProvider` (`@medusajs/payment/dist/providers/system`).
+- **VNPAY `refundPayment`:** lấy `vnp_CreateDate` và số tiền gốc từ `data.payment_url` (URL đã ký của đúng lần thử đã trả), `vnp_TransactionNo` từ `data.vnp_transaction_no` do IPN ghi (BE-5a). Lỗi VNPAY trả `NOT_ALLOWED` kèm mã; lỗi mạng trả `UNEXPECTED_STATE`; cả hai dừng workflow và gây `REFUND_FAILED` ở route.
+
+**Chưa kiểm (cần sandbox thật):** gọi `merchant_webapi/api/transaction` với `VNPAY_TMN_CODE`/`VNPAY_HASH_SECRET` thật; `vnp_Amount` ×100 của refund; ô `vnp_TransactionNo` rỗng trong chuỗi ký; sandbox có bật hoàn tiền cho tài khoản không; chữ ký của response (ta chưa verify, chỉ đọc `vnp_ResponseCode`). Nếu VNPAY trả `97` (sai chữ ký), thử bỏ ô rỗng hoặc đổi `vnp_Amount` rồi ghi kết quả vào mục này.
+
+**Bằng chứng:** `src/modules/vnpay/__tests__/refund-client.unit.spec.ts` (10 test), `service.unit.spec.ts` (5 test refund), `integration-tests/http/customer-cancel.spec.ts` (6 test). Kiểm đột biến: bỏ lọc `customer_id` thì ca "người khác" nhận 200; bỏ `assertRefundedStep` thì ca refund lỗi nhận 200.

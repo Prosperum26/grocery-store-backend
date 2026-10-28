@@ -27,6 +27,7 @@ import {
   PaymentSessionStatus,
 } from "@medusajs/framework/utils"
 import { fromVnpAmount } from "./lib/amount"
+import { requestVnpayRefund } from "./lib/refund-client"
 import { verifyParams } from "./lib/signature"
 import { buildTxnRef, parseTxnRef } from "./lib/txn-ref"
 import { buildPaymentUrl } from "./lib/url"
@@ -38,12 +39,40 @@ export type VnpayOptions = {
   returnUrl: string
   /** vnp_IpAddr; mặc định 127.0.0.1 (sandbox). */
   ipAddr?: string
+  /** URL API hoàn tiền (merchant_webapi); mặc định URL sandbox. */
+  apiUrl?: string
 }
 
 // Phiên VNPAY được coi là đã trả khi IPN hợp lệ đã đánh dấu `data.paid` (route hooks/vnpay/ipn).
 // Dấu này là thứ duy nhất cho phép authorizePayment trả "authorized": storefront cũng gọi
 // authorizePayment khi `complete` giỏ, nên không có nó thì ai có id giỏ cũng lấy được đơn chưa trả tiền.
 const isPaid = (data?: Record<string, unknown>) => data?.paid === true
+
+// vnp_CreateBy của yêu cầu hoàn: hệ thống tự hoàn khi khách huỷ đơn, không có tên người dùng.
+const REFUND_CREATED_BY = "Com4Fud"
+
+// Lấy lại thông tin của giao dịch gốc từ data của payment. `payment_url` là URL đã ký của lần thử đã trả
+// (txn_ref và URL luôn cùng một lần thử), nên vnp_CreateDate và vnp_Amount của request `pay` đọc được từ đó.
+function readOriginalPayment(data: Record<string, unknown>) {
+  const invalid = () =>
+    new MedusaError(MedusaError.Types.INVALID_DATA, "Payment data has no VNPAY txn_ref and payment_url, cannot refund")
+
+  let query: URLSearchParams
+  try {
+    query = new URL(String(data.payment_url)).searchParams
+  } catch {
+    throw invalid()
+  }
+  const createDate = query.get("vnp_CreateDate")
+  if (!data.txn_ref || !createDate) {
+    throw invalid()
+  }
+  try {
+    return { txnRef: String(data.txn_ref), createDate, amountVnd: fromVnpAmount(Number(query.get("vnp_Amount"))) }
+  } catch {
+    throw invalid()
+  }
+}
 
 class VnpayProviderService extends AbstractPaymentProvider<VnpayOptions> {
   static identifier = "vnpay"
@@ -127,9 +156,38 @@ class VnpayProviderService extends AbstractPaymentProvider<VnpayOptions> {
     }
   }
 
-  // Tạm thời: BE-8 thay bằng API hoàn tiền VNPAY thật.
-  async refundPayment(_input: RefundPaymentInput): Promise<RefundPaymentOutput> {
-    throw new MedusaError(MedusaError.Types.NOT_ALLOWED, "Hoàn tiền VNPAY chưa hỗ trợ")
+  // Hoàn tiền qua API refund của VNPAY. Mọi thất bại đều thành MedusaError (D4) để workflow gọi tới
+  // (cancelOrderWorkflow) dừng và bù trừ, không để đơn bị huỷ mà tiền chưa hoàn.
+  async refundPayment(input: RefundPaymentInput): Promise<RefundPaymentOutput> {
+    const data = input.data ?? {}
+    const original = readOriginalPayment(data)
+
+    let result
+    try {
+      result = await requestVnpayRefund(this.options_, {
+        txnRef: original.txnRef,
+        amountVnd: new BigNumber(input.amount).numeric,
+        originalAmountVnd: original.amountVnd,
+        transactionDate: original.createDate,
+        transactionNo: typeof data.vnp_transaction_no === "string" ? data.vnp_transaction_no : undefined,
+        orderInfo: `Hoan tien ${original.txnRef}`,
+        createBy: REFUND_CREATED_BY,
+      })
+    } catch (e) {
+      if (MedusaError.isMedusaError(e)) {
+        throw e
+      }
+      // Lỗi mạng: không biết VNPAY đã nhận yêu cầu hay chưa.
+      throw new MedusaError(MedusaError.Types.UNEXPECTED_STATE, `VNPAY refund request failed: ${(e as Error).message}`)
+    }
+
+    if (!result.ok) {
+      throw new MedusaError(
+        MedusaError.Types.NOT_ALLOWED,
+        `VNPAY refund rejected (code ${result.code}): ${result.message ?? "no message"}`
+      )
+    }
+    return { data: { ...data, vnp_refund_transaction_no: result.transactionNo } }
   }
 
   async getWebhookActionAndData(payload: ProviderWebhookPayload["payload"]): Promise<WebhookActionResult> {

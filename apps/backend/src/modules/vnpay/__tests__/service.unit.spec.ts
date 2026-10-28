@@ -152,9 +152,73 @@ describe("VnpayProviderService vòng đời phiên", () => {
     expect((await service().capturePayment({ data })).data).toEqual(data)
   })
 
-  it("refundPayment tạm ném NOT_ALLOWED", async () => {
-    await expect(service().refundPayment({ amount: 1000, data: {} })).rejects.toMatchObject({
-      type: MedusaError.Types.NOT_ALLOWED,
+})
+
+describe("VnpayProviderService.refundPayment", () => {
+  const fetchMock = jest.fn()
+  beforeEach(() => {
+    fetchMock.mockReset()
+    jest.spyOn(global, "fetch").mockImplementation(fetchMock as unknown as typeof fetch)
+  })
+  afterEach(() => jest.restoreAllMocks())
+
+  const vnpayReply = (body: Record<string, string>) =>
+    fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => body })
+
+  // data của payment đã trả: phiên do initiatePayment tạo, IPN thêm paid và mã giao dịch VNPAY.
+  async function paidPaymentData(): Promise<Record<string, unknown>> {
+    const started = await service().initiatePayment({
+      amount: 390000,
+      currency_code: "vnd",
+      context: { idempotency_key: SESSION_ID },
     })
+    return { ...started.data, paid: true, vnp_transaction_no: "14000001", vnp_pay_date: "20261026233500" }
+  }
+
+  it("gọi API hoàn với txn_ref, mã giao dịch VNPAY, ngày tạo và số tiền gốc lấy từ payment_url", async () => {
+    vnpayReply({ vnp_ResponseCode: "00", vnp_TransactionNo: "14000999" })
+    const data = await paidPaymentData()
+    const createDate = new URL(data.payment_url as string).searchParams.get("vnp_CreateDate")
+
+    const out = await service().refundPayment({ amount: 390000, data })
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body)
+    expect(body).toMatchObject({
+      vnp_Command: "refund",
+      vnp_TransactionType: "02",
+      vnp_TxnRef: data.txn_ref,
+      vnp_Amount: 39000000,
+      vnp_TransactionNo: "14000001",
+      vnp_TransactionDate: createDate,
+    })
+    expect(out.data).toMatchObject({ txn_ref: data.txn_ref, paid: true, vnp_refund_transaction_no: "14000999" })
+  })
+
+  it("hoàn một phần: số tiền nhỏ hơn số tiền gốc thì vnp_TransactionType là 03", async () => {
+    vnpayReply({ vnp_ResponseCode: "00" })
+    await service().refundPayment({ amount: 100000, data: await paidPaymentData() })
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({ vnp_TransactionType: "03" })
+  })
+
+  it("VNPAY trả mã lỗi -> MedusaError NOT_ALLOWED có mã trong message", async () => {
+    vnpayReply({ vnp_ResponseCode: "95", vnp_Message: "Original transaction failed" })
+    const failure = service().refundPayment({ amount: 390000, data: await paidPaymentData() })
+    await expect(failure).rejects.toMatchObject({ type: MedusaError.Types.NOT_ALLOWED, message: expect.stringContaining("95") })
+  })
+
+  it("lỗi mạng -> MedusaError UNEXPECTED_STATE", async () => {
+    fetchMock.mockRejectedValue(new Error("ECONNRESET"))
+    const failure = service().refundPayment({ amount: 390000, data: await paidPaymentData() })
+    await expect(failure).rejects.toMatchObject({
+      type: MedusaError.Types.UNEXPECTED_STATE,
+      message: expect.stringContaining("ECONNRESET"),
+    })
+  })
+
+  it("data thiếu txn_ref hoặc payment_url (không phải payment VNPAY hợp lệ) -> INVALID_DATA, không gọi mạng", async () => {
+    await expect(service().refundPayment({ amount: 1000, data: {} })).rejects.toMatchObject({
+      type: MedusaError.Types.INVALID_DATA,
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 })
