@@ -6,7 +6,9 @@ import {
   validateAndTransformBody,
 } from '@medusajs/framework/http'
 import { StartDeliveryBody } from './admin/orders/[id]/start-delivery/validators'
+import { AssistantChatBody } from './store/assistant/chat/validators'
 import { SetDeliverySlotBody } from './store/carts/[id]/delivery-slot/validators'
+import { RecipeSearchBody } from './store/recipes/semantic-search/validators'
 
 // The product index declares filterable `status` and `sales_channel_ids`, so
 // the route narrows it to published products in the key's sales channels.
@@ -54,6 +56,17 @@ export default defineMiddlewares({
     {
       matcher: '/store/predictive/*',
       middlewares: [authenticate('customer', ['session', 'bearer'])],
+    },
+    // Trợ lý Bếp (BE-10): kiểm body theo hợp đồng ngay cả khi route còn là bản giữ chỗ.
+    {
+      method: ['POST'],
+      matcher: '/store/recipes/semantic-search',
+      middlewares: [validateAndTransformBody(RecipeSearchBody)],
+    },
+    {
+      method: ['POST'],
+      matcher: '/store/assistant/chat',
+      middlewares: [validateAndTransformBody(AssistantChatBody)],
     },
     // Order retrieve omits `metadata` (the list route has it); needed for metadata.stage.
     // Risk: this route is unauthenticated, anyone holding the order UUID can read it.
