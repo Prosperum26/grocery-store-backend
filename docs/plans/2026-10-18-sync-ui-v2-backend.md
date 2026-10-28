@@ -24,7 +24,7 @@
 | BE-9 | Stub `reorder-basket` và `warm` | P2 | BE-2 | [x] Xong · `51a300d`; xếp theo tần suất trong đơn DELIVERED, bản tạm cho module Predictive |
 | BE-10 | Hợp đồng Trợ lý Bếp / Công thức (chỉ kiểu dữ liệu + fixture) | P2 | | [x] Xong · `41df2eb`; `src/types/assistant.ts`, `docs/contracts/assistant-recipes.md`, ví dụ từ dữ liệu thật; hai route kiểm body rồi trả 501 cho tới khi nối AI service |
 | BE-11 | Admin: Việt hóa, widget Tổng quan, widget Sắp cạn kho | P3 | BE-2 | [x] Xong · `4b11660`, `4848531`; widget Tổng quan (Đơn hàng), Sắp cạn kho (Tồn kho), API-9, dịch nhóm nút tùy chỉnh bố cục; đã kiểm trên trình duyệt 29/10. Màu: phương án A (chỉ widget của nhóm). Tiếng Việt chọn ở Profile; widget đưa lên trên bảng bằng Tùy chỉnh trang |
-| BE-12 | Dọn dẹp, cập nhật `.env.template`, README | P3 | tất cả | [ ] Chưa làm (đã xoá `initial-data-seed.ts`; còn `seed-demo-products.ts`, route `custom` mẫu) |
+| BE-12 | Dọn dẹp, cập nhật `.env.template`, README | P3 | tất cả | [x] Xong · `1b9bda9`, `e8bf3c9`, `410c712`, `cbc4763`, `0660846`; xoá seed áo quần và route mẫu, test chạy được trên Windows (`cross-env`), README tiếng Anh, bảng API đồng bộ route thật |
 
 Ký hiệu: `[x]` xong và đã kiểm · `[~]` code và test xong nhưng còn bước kiểm tay hoặc phần thiếu · `[ ]` chưa làm. Cập nhật 2026-10-28, đối chiếu với code và nhật ký tiến độ của người làm backend; chi tiết từng task ở nhật ký đó và `docs/contracts/verified-apis.md`.
 
@@ -281,7 +281,7 @@ Mọi route `/store/*` cần `x-publishable-api-key`; route của khách cần t
 - [x] Xóa `src/scripts/seed-demo-products.ts` (áo quần) và hai route mẫu `custom` (`1b9bda9`).
 - [x] Cập nhật `.env.template`: `DEMO_PASSWORD` có từ BE-2c; thêm ghi chú `REDIS_URL` chưa dùng, secret chỉ cho dev, dạng `DATABASE_URL`; bỏ script `storefront:dev` (`410c712`). BE-3 không thêm biến search nào.
 - [x] Script test chạy được trên Windows bằng `cross-env`; lock do npm 10.9.8 sinh (`e8bf3c9`).
-- [x] Cập nhật `README.md`: viết lại bằng tiếng Anh theo repo thật (npm, Docker Postgres, seed `npm run seed`).
+- [x] Cập nhật `README.md`: viết lại bằng tiếng Anh theo repo thật (npm, Docker Postgres, seed `npm run seed`) (`0660846`).
 - [x] Rà bảng API mục 3 với route thật: sửa API-1, 2, 5, 6, 7; thêm API-10 đến 13. File FE không có bảng hợp đồng riêng (chỉ bảng giữ chỗ ở mục 4, vẫn đúng).
 
 ## 5. Cách chia đôi công việc khi sync dở
@@ -296,6 +296,7 @@ Mọi route `/store/*` cần `x-publishable-api-key`; route của khách cần t
 
 | Ngày | Người | Đã xong | Dở dang / lưu ý |
 | :--- | :--- | :--- | :--- |
+| 2026-10-29 | | BE-12 xong (`0660846`); integration 15 suite / 58 test pass khi chạy từ PowerShell. 10/12 task xong | Còn BE-5, BE-8: thanh toán và hoàn tiền trên VNPAY sandbox thật. Ngoài plan BE: BE-2b (ảnh), đợt 4 đấu FE |
 | 2026-10-29 | | BE-11 xong (`4848531`), đã kiểm trên trình duyệt | Medusa 2.21 xếp widget sau bảng chính, sắp lại bằng Tùy chỉnh trang (lưu trong DB); còn BE-12, VNPAY sandbox (BE-5, BE-8) |
 | 2026-10-29 | | BE-11 code xong (`4b11660`); integration 15 suite / 58 test, unit 110 pass | Xem widget Tổng quan và Sắp cạn kho trên trình duyệt; BE-12; VNPAY sandbox (BE-5, BE-8) |
 | 2026-10-29 | | BE-10 xong (`41df2eb`); integration 14 suite / 57 test pass. Nhóm chốt: BE-2b làm sau, FE thêm 3 ô danh mục | Gửi hợp đồng cho nhóm AI (câu hỏi A1–A4); còn VNPAY sandbox (BE-5, BE-8), BE-11, BE-12 |
