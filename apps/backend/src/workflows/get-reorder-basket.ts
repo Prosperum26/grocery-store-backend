@@ -1,5 +1,6 @@
 import { ContainerRegistrationKeys, QueryContext } from "@medusajs/framework/utils"
 import { createStep, createWorkflow, StepResponse, WorkflowResponse } from "@medusajs/framework/workflows-sdk"
+import { availableOf, VARIANT_STOCK_FIELDS } from "../lib/inventory/available"
 import { PastOrder, pickReorderItems, REORDER_LIMIT } from "../lib/predictive/reorder"
 
 /**
@@ -58,16 +59,13 @@ const loadReorderBasketStep = createStep(
       fields: [
         "id",
         "title",
-        "manage_inventory",
         "product.id",
         "product.handle",
         "product.title",
         "product.status",
         "product.metadata",
         "calculated_price.calculated_amount",
-        "inventory_items.required_quantity",
-        "inventory_items.inventory.location_levels.stocked_quantity",
-        "inventory_items.inventory.location_levels.reserved_quantity",
+        ...VARIANT_STOCK_FIELDS,
       ],
       filters: { id: ranked.map((r) => r.variant_id) },
       context: { calculated_price: QueryContext({ currency_code: "vnd" }) },
@@ -97,22 +95,6 @@ const loadReorderBasketStep = createStep(
     return new StepResponse<ReorderBasket>({ status: items.length ? "ready" : "empty", items, total })
   }
 )
-
-// Tồn khả dụng = tồn trừ hàng đang giữ, cộng mọi kho (hiện chỉ có Kho Q.7). Cùng công thức với chỉ mục
-// tìm kiếm (search/helpers/stock.ts) nhưng tính theo biến thể. Không quản kho thì coi như luôn còn.
-function availableOf(variant: any): number {
-  if (variant.manage_inventory === false) {
-    return Number.MAX_SAFE_INTEGER
-  }
-  const perItem = (variant.inventory_items ?? []).map((item: any) => {
-    const total = (item.inventory?.location_levels ?? []).reduce(
-      (sum: number, l: any) => sum + Number(l.stocked_quantity ?? 0) - Number(l.reserved_quantity ?? 0),
-      0
-    )
-    return Math.floor(total / (item.required_quantity || 1))
-  })
-  return perItem.length ? Math.max(0, Math.min(...perItem)) : 0
-}
 
 export const getReorderBasketWorkflow = createWorkflow(
   "get-reorder-basket",

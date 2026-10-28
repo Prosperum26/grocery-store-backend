@@ -207,6 +207,14 @@ Region "Việt Nam" chỉ có một phương thức thanh toán: VNPAY (`pp_vnpa
 - **IPN** là `GET /hooks/vnpay/ipn` và cần một URL công khai HTTPS. Khi dev dùng tunnel (ví dụ cloudflared hoặc ngrok trỏ tới cổng 9000), rồi khai báo `https://<tunnel>/hooks/vnpay/ipn` trong cổng sandbox VNPAY (mục cấu hình IPN URL của merchant). Return URL chỉ để hiển thị, không đổi trạng thái đơn.
 - `npm run seed` cập nhật region đang có (DB cũ còn `pp_system_default`) sang chỉ còn VNPAY.
 
+## Admin
+
+Mở `http://localhost:9000/app` (tài khoản demo ở mục Seed).
+
+- **Tiếng Việt:** Admin có sẵn bản dịch nhưng mặc định là tiếng Anh, và không đặt mặc định được từ server. Mỗi người chọn một lần ở **Profile → Language → Tiếng Việt**; lựa chọn lưu trong trình duyệt (localStorage `lng`).
+- **Widget của nhóm:** "Tổng quan" trên đầu trang Đơn hàng (`GET /admin/dashboard/summary`), "Sắp cạn kho" trên đầu trang Tồn kho (`GET /admin/dashboard/low-stock`), "Giao hàng" ở cột phải trang chi tiết đơn (`POST /admin/orders/:id/start-delivery`).
+- **Màu:** Medusa 2.21.1 không có cấu hình màu cho Admin (màu là biến CSS cứng trong `@medusajs/dashboard`, file CSS gốc do Medusa tự sinh lúc build). Vì vậy chỉ widget của nhóm dùng màu Com4Fud (`src/admin/lib/com4fud.ts`) ở điểm nhấn; phần còn lại giữ màu Medusa. Đây là lựa chọn của nhóm (BE-11, phương án A), không ghi đè CSS của Medusa.
+
 ## Resources
 
 - [Medusa Documentation](https://docs.medusajs.com)
