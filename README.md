@@ -169,5 +169,6 @@ Open `http://localhost:9000/app`.
 
 - [`AGENTS.md`](AGENTS.md): Medusa conventions for this repo
 - [`docs/contracts/verified-apis.md`](docs/contracts/verified-apis.md): Medusa 2.21.1 behavior checked by running it, per task
+- [`docs/known-risks.md`](docs/known-risks.md): open risks (VNPAY refunds, holds, payment sessions)
 - [`docs/contracts/assistant-recipes.md`](docs/contracts/assistant-recipes.md): kitchen assistant and recipe contract
 - [Medusa documentation](https://docs.medusajs.com)

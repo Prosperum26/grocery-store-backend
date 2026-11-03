@@ -12,7 +12,7 @@
 
 | Task | Nội dung | Phụ thuộc | Trạng thái |
 | :--- | :--- | :--- | :--- |
-| HS-0 | Spike: kiểm các hành vi Medusa mà plan dựa vào | | [ ] |
+| HS-0 | Spike: kiểm các hành vi Medusa mà plan dựa vào | | [x] Xong · kết quả ở `verified-apis.md` mục HS-0 |
 | HS-1 | Redis, `ioredis`, khung module `hot-stock` | HS-0 | [ ] |
 | HS-2 | Chuyển 3 script Lua vào module, sửa lỗi, test jest | HS-1 | [ ] |
 | HS-3 | Bản sao tồn kho trong Redis: dựng từ Postgres, đồng bộ, đối soát | HS-2 | [ ] |
@@ -102,7 +102,7 @@ Ví dụ cho nhánh cuối (kho còn 1 hộp dâu): A giữ ở 0:00, trả ti�
 ```text
 apps/backend/src/modules/hot-stock/
   index.ts, service.ts          HotStockModuleService: reserve, release, confirm, expireDue, syncItems
-  lua/*.lua                     reserve_hold, release_hold, confirm_hold, sync_item
+  lua/*.ts                      reserve_hold, release_hold, confirm_hold, sync_item (chuỗi Lua)
   lib/keys.ts                   dựng tên key (hàm thuần, có unit test)
 apps/backend/src/workflows/
   reserve-cart-stock.ts         đọc giỏ → gộp dòng → giữ hàng; compensation: release
@@ -127,10 +127,14 @@ apps/realtime-gateway/                                     (HS-8)
 
 Những API khác (API-1 đến 13) không đổi. `inventory_quantity` trong Store API vẫn là số của Medusa (chưa trừ phần đang giữ).
 
-## 4. Câu hỏi mở
+## 4. Câu hỏi mở và rủi ro
+
+Rủi ro chưa xử lý được gom ở [`docs/known-risks.md`](../known-risks.md) (R1–R6); khi sửa xong thì cập nhật dòng ở đó.
 
 - **O1:** Có chặn tạo payment session khi giỏ chưa giữ hàng không? Hiện **không**: nhánh D4 của IPN đã xử lý trường hợp khách bỏ qua API-14. Chặn thêm thì phải sửa route Medusa có sẵn, nên chỉ làm nếu thầy hỏi.
 - **O2:** Hoàn tiền khi IPN hết hàng (D4) dùng `refund-client.ts` của BE-8, và chưa kiểm được trên sandbox (giống BE-8). Gọi API hoàn tiền thất bại thì ghi `stock_failed.refund = "failed"` để Admin xử lý tay.
+- **R1 (HS-0):** khách mở 2 lần thanh toán: phiên VNPAY cũ bị xoá, trả bằng link cũ thì IPN trả `01`, tiền đã thu mà không có đơn. Có từ trước hot-stock; link 10 phút (D2) thu hẹp khoảng này. Có thể sửa sau bằng cách IPN tra phiên `withDeleted` rồi hoàn tiền; chưa làm trong plan.
+- **R2 (HS-0):** Medusa tự hoàn tiền khi hoàn tất giỏ lỗi sau khi đã thu tiền, nhưng hoàn tiền lỗi thì chỉ ghi log. Xử lý phát hiện ở HS-6.
 - **O3:** HS-9 bật event bus Redis thì mọi subscriber (BE-3, BE-6, IPN) chạy qua hàng đợi. Chỉ làm nếu còn thời gian và chạy lại toàn bộ test.
 
 ---
@@ -139,12 +143,12 @@ Những API khác (API-1 đến 13) không đổi. `inventory_quantity` trong St
 
 **Xong khi:** mỗi câu dưới đây có câu trả lời đã chạy thật, ghi vào `verified-apis.md` mục HS-0. Câu nào khác giả định thì sửa thiết kế ở mục 2 trước khi làm tiếp.
 
-- [ ] Payload của `inventory-level.created/updated/deleted` và `reservation-item.created/updated/deleted` (chỉ có `id`? đọc lại được bản ghi đã xoá không?). Hủy đơn (`cancelOrderWorkflow`, BE-8) và hoàn tất giỏ có phát các event này không.
-- [ ] Hoàn tất giỏ tạo reservation trước hay sau `order.placed`; `order.placed` có `data.id` là order id. Tra cart từ order qua link `order_cart` bằng `query.graph`.
-- [ ] Biến thể → `inventory_items[].inventory_item_id`, `required_quantity` (catalog hiện có 1 item mỗi biến thể; vẫn nhân `required_quantity`).
-- [ ] Tạo payment session mới cho giỏ đã có session VNPAY thì session cũ bị xoá hay giữ (ảnh hưởng IPN tìm phiên).
-- [ ] Hoàn tất giỏ thiếu hàng trong Postgres thì `processPaymentWorkflow` báo lỗi gì và để lại trạng thái gì.
-- [ ] Module tự viết nhận `options` từ `medusa-config.ts` và dọn kết nối khi tắt (`__hooks.onApplicationShutdown` hoặc tương đương 2.21.1); cấu hình scheduled job (`config.schedule`).
+- [x] `inventory-level.*` gửi `{ id }` (id level); `reservation-item.*` gửi `{ id, order_id }`. Hoàn tất giỏ phát `reservation-item.created` nhưng **không** phát `inventory-level.updated`; hủy đơn phát `reservation-item.deleted`. Bản đã xoá đọc được bằng `withDeleted: true`.
+- [x] Cả hai event phát sau khi workflow xong (reservation đã có trong Postgres khi subscriber chạy). `order.placed { id }` là order id; cart qua `order_cart` hoặc `order.cart.id`.
+- [x] Biến thể có `manage_inventory`, `inventory_items[].inventory_item_id`, `required_quantity` (= 1 trong catalog).
+- [x] Phiên cũ bị xoá. Trả bằng link cũ thì IPN trả `01`, đã thu tiền mà không có đơn: rủi ro R1 (mục 4).
+- [x] Payment captured trước, hoàn tất giỏ lỗi `Not enough stock...`; Medusa tự hoàn tiền (`refundPaymentAndRecreatePaymentSessionWorkflow`) và tạo phiên mới. Hoàn tiền lỗi thì chỉ ghi log: rủi ro R2 (mục 4).
+- [x] `__hooks.onApplicationShutdown` có trong 2.21.1; job export `config { name, schedule }`. `medusa build` không chép `.lua`, nên Lua nhúng trong `.ts`.
 
 ## Task HS-1: Redis, `ioredis`, khung module
 
@@ -159,7 +163,7 @@ Những API khác (API-1 đến 13) không đổi. `inventory_quantity` trong St
 
 ## Task HS-2: Script Lua
 
-**Files:** `src/modules/hot-stock/lua/*.lua`, `service.ts`, `lib/keys.ts`, `src/modules/hot-stock/__tests__/*.spec.ts`.
+**Files:** `src/modules/hot-stock/lua/*.ts`, `service.ts`, `lib/keys.ts`, `src/modules/hot-stock/__tests__/*.spec.ts`.
 
 **Xong khi:** các test của repo thử (bước 1–3) chạy bằng jest trên Redis thật, cộng các ca mới dưới đây.
 
@@ -167,7 +171,7 @@ Những API khác (API-1 đến 13) không đổi. `inventory_quantity` trong St
 - [ ] **Sửa 1 (D5):** hold đang `HELD` thì cộng trả rồi giữ lại theo giỏ mới; hold `RELEASED`/`EXPIRED` thì ghi đè; `CONFIRMED` trả `3`.
 - [ ] **Sửa 2:** `release_hold` nhận đủ key qua `KEYS` (không lấy tên key từ field rồi ghi), đúng quy tắc khai báo key của Redis.
 - [ ] Thêm bộ đếm `stock:held:*` trong cả 3 script; thêm `sync_item.lua` (mục 2.2).
-- [ ] Service nạp script một lần bằng `defineCommand`, đọc file `.lua` bằng `readFileSync` theo `__dirname`. Kiểm `medusa build` có chép file `.lua` vào `.medusa/server` không; không thì nhúng nội dung script vào file `.ts`.
+- [ ] Service nạp script một lần bằng `defineCommand`. Script là chuỗi hằng trong `lua/*.ts` (HS-0: `medusa build` không chép `.lua`); giữ định dạng nhiều dòng và comment để đọc được.
 - [ ] Test: 100 lần giữ đồng thời tranh 5 món × 20 lượt (đúng 5 thành công, `avail ≥ 0`); giỏ nhiều món tất cả hoặc không; giữ lại sau `EXPIRED` thì trừ lại thật; giữ lại khi giỏ đổi số lượng; confirm và release chạy đua; `expireDue` song song; `sync_item` chen giữa các lần giữ.
 - [ ] Commit `feat(hot-stock): atomic hold scripts ported from issue #9`.
 
@@ -178,7 +182,7 @@ Những API khác (API-1 đến 13) không đổi. `inventory_quantity` trong St
 **Xong khi:** sau seed, mọi item có key đúng `stocked − reserved`; admin sửa tồn trong Admin thì key đổi trong vài giây; hủy đơn thì key tăng lại; test đối chiếu Redis với Postgres.
 
 - [ ] Workflow `sync-hot-stock` nhận `inventory_item_ids` (hoặc rỗng = toàn bộ), đọc inventory level tại Kho Q.7 bằng `query.graph`, chạy `sync_item` theo lô.
-- [ ] Subscriber cho các event đã kiểm ở HS-0. Event không đọc được item (bản ghi đã xoá) thì đặt lại toàn bộ.
+- [ ] Subscriber `inventory-level.created/updated/deleted` (tra level theo id, `withDeleted` khi xoá) và `reservation-item.created/updated/deleted` (tra reservation theo id, `withDeleted`) → đặt lại item đó. Không tra được thì đặt lại toàn bộ.
 - [ ] Job đối soát 15 phút; ghi log số item lệch (bằng chứng cho báo cáo về TR-01).
 - [ ] Script `npx medusa exec ./src/scripts/rebuild-hot-stock.ts`; seed gọi cuối cùng.
 - [ ] Commit `feat(hot-stock): mirror available stock from postgres`.
@@ -214,7 +218,8 @@ Những API khác (API-1 đến 13) không đổi. `inventory_quantity` trong St
 
 - [ ] `EXPIRE_MS` 10 phút (D2); sửa test của `url.ts`.
 - [ ] Bước 5 của IPN (thanh toán không thành công): nhả hold của giỏ, vẫn trả `00`.
-- [ ] Bước 6 (thành công), trước khi phát event: workflow `guard-paid-cart-stock` (D4). Hết hàng thì hoàn tiền bằng `refund-client.ts` theo `vnp_transaction_no`, ghi `cart.metadata.stock_failed`, không phát event. IPN gửi lại thì đọc `stock_failed` và trả `02`.
+- [ ] Bước 6 (thành công), trước khi phát event: workflow `guard-paid-cart-stock` (D4). Hết hàng thì hoàn tiền bằng `refund-client.ts` theo `vnp_transaction_no`, ghi `cart.metadata.stock_failed`, không phát event. IPN gửi lại thì đọc `stock_failed` và trả `02`. Phải tự hoàn vì lúc này chưa có payment trong Medusa và Postgres vẫn còn hàng (món chỉ đang giữ trong Redis), nên compensation của Medusa không chạy.
+- [ ] R2: sau khi phát event, nếu hoàn tất giỏ lỗi thì Medusa tự hoàn tiền nhưng nuốt lỗi. Job đối soát (HS-3) liệt kê payment `captured` không có đơn và không có refund, ghi log cảnh báo và `cart.metadata.payment_stuck` để Admin xử lý tay.
 - [ ] Test: thất bại thì nhả; thành công khi `HELD`; thành công sau khi hết hạn mà còn hàng; thành công sau khi hết hạn mà hết hàng (mock refund client) thì không có đơn; IPN gửi lặp.
 - [ ] Ghi chú trong `verified-apis.md`: phần hoàn tiền chung trạng thái "chưa kiểm sandbox" với BE-8.
 - [ ] Commit `feat(vnpay): hold-aware IPN and 10 minute payment link`.

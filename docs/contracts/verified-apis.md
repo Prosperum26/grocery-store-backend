@@ -305,3 +305,32 @@ Tài liệu ghi sai độ dài một số cột (`vnp_ResponseCode` "[14]", `vnp
 
 - **Lockfile:** `package-lock.json` của commit khởi tạo ghi `dev` cho khoảng 20 gói (`typescript`, `@swc/core`, `@types/react`, `yalc`…) mà npm 10.9.8 (bản repo ghim) và npm 11 đều tính là `devOptional`. Đã commit lock do npm 10.9.8 sinh ra, chỉ đổi cờ, không đổi phiên bản gói.
 - **`cross-env`** làm script `test:*` chạy được từ PowerShell/cmd; đã chạy đủ 15 suite integration từ PowerShell mà không đặt `npm_config_script_shell`.
+
+## HS-0 — Spike cho Redis hot-stock
+
+Chạy bằng một test tích hợp tạm (subscribe trực tiếp event bus, catalog 32 món, provider `pp_system_default` và VNPAY với khóa thử), 2026-11-03. File test đã xoá sau khi ghi lại.
+
+**Event tồn kho:**
+- Sửa tồn bằng `updateInventoryLevelsWorkflow` phát đúng một `inventory-level.updated { id }` (id inventory level, không kèm item hay location).
+- Hoàn tất giỏ phát `order.placed { id }` và `reservation-item.created { id, order_id }`; **không** phát `inventory-level.updated` dù `reserved_quantity` của level tăng. Đồng bộ phần đã giữ phải nghe `reservation-item.*`.
+- `cancelOrderWorkflow` phát `order.canceled { id }` và `reservation-item.deleted { id, order_id }`; `reserved_quantity` về 0. Reservation đã xoá vẫn đọc được bằng `query.graph({ ..., withDeleted: true })` (có `inventory_item_id`, `deleted_at`); không có `withDeleted` thì trả rỗng.
+- Thứ tự hai event của hoàn tất giỏ không cố định theo nghĩa nghiệp vụ (log thấy `order.placed` trước). Cả hai phát sau khi workflow xong, nên lúc subscriber chạy thì reservation đã có trong Postgres.
+
+**Giỏ, đơn, biến thể:**
+- Cart của đơn: `order_cart { order_id, cart_id }`, hoặc `order` với field `cart.id`.
+- Biến thể: `manage_inventory`, `inventory_items[].inventory_item_id`, `inventory_items[].required_quantity` (catalog hiện 1 item, `required_quantity = 1`).
+
+**Phiên thanh toán:**
+- Tạo phiên VNPAY lần hai cho cùng payment collection thì **phiên cũ bị xoá** (chỉ còn phiên mới, `txn_ref` mới). Khách trả bằng link cũ thì IPN không tìm thấy phiên và trả `01`, tiền đã thu mà không có đơn. Rủi ro có từ trước hot-stock; link 10 phút (D2) thu hẹp nhưng không bỏ được.
+
+**Hoàn tất giỏ khi Postgres thiếu hàng:**
+- `POST /store/carts/:id/complete` trả `400 { type: "not_allowed", message: "Not enough stock available for item <iitem> at location <sloc>" }`.
+- Qua IPN (thành công): IPN trả `00`, payment được tạo và **captured trước**, rồi hoàn tất giỏ lỗi. Compensation `compensatePaymentIfNeededStep` (`core-flows/dist/cart/steps/compensate-payment-if-needed.js`) tự chạy `refundPaymentAndRecreatePaymentSessionWorkflow`: gọi `refundPayment` của provider (VNPAY refund API) rồi tạo lại phiên thanh toán mới, nên phiên cũ không còn. Bỏ qua hoàn tiền nếu giỏ đã có đơn.
+- Hoàn tiền lỗi thì **chỉ ghi log** (`Error was thrown trying to cancel payment ... VNPAY refund rejected (code 99)` với khóa thử), không ném lỗi: payment vẫn captured, không đơn, giỏ chưa hoàn tất, không ai được báo. Dòng nhật ký "refund trả 99" trong plan `2026-10-18` có lẽ đến từ đường này với khóa thử.
+
+**Module, job, build:**
+- Module service có `__hooks: { onApplicationStart, onApplicationShutdown, onApplicationPrepareShutdown }` (`@medusajs/types` modules-sdk) để mở và đóng kết nối Redis.
+- Scheduled job: file trong `src/jobs` export hàm `(container)` và `config { name, schedule (cron), numberOfExecutions? }`.
+- `medusa build` chỉ biên dịch TypeScript và chép file package (`framework/dist/build-tools/compiler.js`), **không chép `.lua`**. Script Lua phải nằm trong file `.ts` (chuỗi hằng).
+
+**Quyết định cho plan hot-stock:** đồng bộ nghe `inventory-level.*` và `reservation-item.*`, đọc bản đã xoá bằng `withDeleted`; Lua nhúng trong `.ts`; nhánh hết hàng của D4 vẫn phải tự hoàn tiền vì ở thời điểm đó Postgres còn hàng (món chỉ đang được giữ trong Redis) nên Medusa không tự hoàn; IPN của phiên đã bị thay ghi nhận là rủi ro.
