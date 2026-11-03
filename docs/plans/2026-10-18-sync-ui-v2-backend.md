@@ -81,6 +81,7 @@ Mọi route `/store/*` cần `x-publishable-api-key`; route của khách cần t
 | API-11 | `GET /store/vnpay/verify-return?<vnp_*>` | BE-5a | `{ valid, success }`: chỉ kiểm chữ ký và `vnp_ResponseCode` để trang return hiển thị; không đổi đơn. |
 | API-12 | `GET /hooks/vnpay/ipn?<vnp_*>` | BE-5a | Chỉ VNPAY gọi. Luôn HTTP 200 `{ RspCode, Message }` (00, 01, 02, 04, 97, 99); thanh toán hợp lệ thì Medusa tạo đơn từ giỏ. |
 | API-13 | `POST /admin/orders/:id/confirm` | BE-6 | `PENDING` → `CONFIRMED`; đơn không ở `PENDING` → 400, đơn lạ → 404. Nút "Xác nhận đơn" nằm trong Admin (widget `order-confirm.tsx`, cột bên của trang đơn, chỉ hiện khi đơn ở `PENDING`, có hộp hỏi lại). Sau khi xác nhận, khách không tự hủy được nữa (API-6 trả 409). |
+| API-14 | `POST /store/carts/:id/reserve` | Hot-stock HS-4 (`docs/plans/2026-11-03-redis-hot-stock.md`) | Gọi **sau** `addShippingMethod`, **trước** khi tạo phiên VNPAY; body rỗng. `200 { hold: { cart_id, status: "HELD", expires_at } }` (giữ 15 phút); `409 { code: "OUT_OF_STOCK", items: [{ variant_id, inventory_item_id, requested, available }] }` (không giữ món nào); `409 { code: "CART_COMPLETED" }`; `404` giỏ lạ; `400` giỏ không có món quản kho. Gọi lại an toàn: giỏ đổi thì giữ theo giỏ mới. FE phân biệt 409 theo `code` (`SLOT_UNAVAILABLE` của API-4 cũng là 409). |
 
 **Ánh xạ trạng thái đơn (đề xuất để đóng Q5 ở `docs/06`):**
 

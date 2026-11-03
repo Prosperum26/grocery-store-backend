@@ -3,6 +3,7 @@ import { useQueryGraphStep } from "@medusajs/medusa/core-flows"
 import { HOT_STOCK_MODULE } from "../modules/hot-stock"
 import type { StockRef } from "../modules/hot-stock/lib/keys"
 import type HotStockModuleService from "../modules/hot-stock/service"
+import { LEVEL_SYNC_FIELDS, levelSyncEntries, type LevelForSync } from "../lib/inventory/stock-levels"
 
 export type SyncHotStockInput = {
   /** Item cần đặt lại; bỏ trống = toàn bộ (dựng lại, đối soát). */
@@ -11,18 +12,13 @@ export type SyncHotStockInput = {
   removed?: StockRef[]
 }
 
-type Level = { inventory_item_id: string; location_id: string; stocked_quantity: unknown; reserved_quantity: unknown }
-
 // Đẩy số của Postgres sang Redis. Không cần compensation: Redis chỉ là bản sao, chạy lại lúc nào cũng đúng.
 const syncHotStockStep = createStep(
   "sync-hot-stock",
-  async (input: { levels: Level[]; removed: StockRef[] }, { container }) => {
+  async (input: { levels: LevelForSync[]; removed: StockRef[] }, { container }) => {
     const hotStock = container.resolve<HotStockModuleService>(HOT_STOCK_MODULE)
     const summary = await hotStock.syncItems([
-      ...input.levels.map((level) => ({
-        ref: { location_id: level.location_id, inventory_item_id: level.inventory_item_id },
-        postgres_available: Number(level.stocked_quantity) - Number(level.reserved_quantity),
-      })),
+      ...levelSyncEntries(input.levels),
       ...input.removed.map((ref) => ({ ref, postgres_available: 0 })),
     ])
     return new StepResponse(summary)
@@ -41,12 +37,12 @@ export const syncHotStockWorkflow = createWorkflow("sync-hot-stock", (input: Syn
   const skipLevels = transform({ input }, ({ input }) => Array.isArray(input.inventory_item_ids) && !input.inventory_item_ids.length)
   const { data: levels } = useQueryGraphStep({
     entity: "inventory_level",
-    fields: ["inventory_item_id", "location_id", "stocked_quantity", "reserved_quantity"],
+    fields: LEVEL_SYNC_FIELDS,
     filters,
   })
   const summary = syncHotStockStep(
     transform({ levels, input, skipLevels }, ({ levels, input, skipLevels }) => ({
-      levels: skipLevels ? [] : (levels as Level[]),
+      levels: skipLevels ? [] : (levels as LevelForSync[]),
       removed: input.removed ?? [],
     }))
   )

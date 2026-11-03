@@ -16,7 +16,7 @@
 | HS-1 | Redis, `ioredis`, khung module `hot-stock` | HS-0 | [x] Xong · xem task HS-1 |
 | HS-2 | Chuyển 3 script Lua vào module, sửa lỗi, test jest | HS-1 | [x] Xong · 29 test trên Redis thật (`npm run test:integration:modules`) |
 | HS-3 | Bản sao tồn kho trong Redis: dựng từ Postgres, đồng bộ, đối soát | HS-2 | [x] Xong · 7 test http, dựng 2.129 món trên DB dev |
-| HS-4 | Workflow và route giữ hàng (API-14) | HS-3 | [ ] |
+| HS-4 | Workflow và route giữ hàng (API-14) | HS-3 | [x] Xong · 7 test http |
 | HS-5 | Vòng đời hold: xác nhận khi có đơn, hết hạn | HS-4 | [ ] |
 | HS-6 | VNPAY: link 10 phút, nhả khi thất bại, lưới an toàn khi IPN tới muộn | HS-5 | [ ] |
 | HS-7 | Thí nghiệm H4, đo P95, dàn ý `docs/hot-stock.md` | HS-6 | [ ] |
@@ -191,15 +191,15 @@ Rủi ro chưa xử lý được gom ở [`docs/known-risks.md`](../known-risks.
 
 ## Task HS-4: Giữ hàng (API-14)
 
-**Files:** `src/workflows/reserve-cart-stock.ts`, `src/api/store/carts/[id]/reserve/route.ts`, `src/api/middlewares.ts`, `integration-tests/http/hot-stock-reserve.spec.ts`.
+**Files:** `src/workflows/reserve-cart-stock.ts`, `src/api/store/carts/[id]/reserve/route.ts`, `src/lib/inventory/cart-hold-lines.ts` (+ unit test), `integration-tests/http/hot-stock-reserve.spec.ts`. Không cần middleware: body rỗng, route `/store` đã đòi publishable key.
 
 **Xong khi:** các mã trả về của API-14 đúng như mục 3; test http qua route thật với giỏ thật.
 
-- [ ] Workflow: đọc giỏ (`query.graph`, gồm `completed_at`, `items.variant.inventory_items`); gộp các dòng cùng item (repo thử trả `-3` khi trùng); biến thể không quản kho (`manage_inventory = false`) thì bỏ qua; giữ hàng; mã `-1` thì dựng lại item rồi thử lại một lần.
-- [ ] Compensation của bước giữ hàng: `release` khi bước sau trong workflow lỗi.
-- [ ] Route chỉ chạy workflow, đổi lỗi thành 409 có `items` (ánh xạ inventory item về `variant_id`).
-- [ ] Test: đủ hàng; thiếu một món thì không giữ món nào; giỏ đã hoàn tất; gọi 2 lần; đổi số lượng rồi gọi lại; Redis trống thì vẫn giữ được.
-- [ ] Commit `feat(hot-stock): reserve cart stock before payment`.
+- [x] Workflow: đọc giỏ (`query.graph`, gồm `completed_at`, `items.variant.inventory_items`); gộp các dòng cùng item (repo thử trả `-3` khi trùng); biến thể không quản kho (`manage_inventory = false`) thì bỏ qua; giữ hàng; mã `-1` thì dựng lại item rồi thử lại một lần.
+- [x] Compensation của bước giữ hàng: `release` khi bước sau trong workflow lỗi. Hiện bước giữ hàng là bước cuối nên chưa có đường nào kích hoạt; dùng khi HS-6 ghép workflow này vào bước khác. Kho lấy từ `sales_channel.stock_locations` (kho đầu tiên); query không có entity link `sales_channel_stock_location`.
+- [x] Route chỉ chạy workflow. Hết hàng không phải lỗi của workflow (không giữ gì nên không có gì để bù trừ): workflow trả `{ status: "out_of_stock", items }`, route đổi thành 409. `available` của món thiếu đã cộng phần chính giỏ này đang giữ. Một item dùng chung cho nhiều biến thể thì `variant_id` là biến thể đầu tiên.
+- [x] Test: đủ hàng (hạn 15 phút); thiếu một món vì giỏ khác đang giữ, không giữ món nào, giỏ kia trả thì giữ được; hai lần bấm đồng thời; đổi số lượng; hai dòng cùng biến thể được gộp; Redis trống; giỏ đã hoàn tất, giỏ lạ, giỏ trống; 20 giỏ tranh 5 qua HTTP. **Ghi nhận:** Medusa từ chối thêm vào giỏ nhiều hơn tồn Postgres (400), nên giỏ chỉ thiếu trong Redis khi người khác đang giữ; tạo đồng thời nhiều giỏ khách vãng lai **cùng email** thì Medusa lỗi (`Customer ... already exists`, 500).
+- [x] Commit `feat(hot-stock): reserve cart stock before payment`.
 
 ## Task HS-5: Xác nhận và hết hạn
 

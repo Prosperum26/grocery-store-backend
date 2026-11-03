@@ -334,3 +334,11 @@ Chạy bằng một test tích hợp tạm (subscribe trực tiếp event bus, c
 - `medusa build` chỉ biên dịch TypeScript và chép file package (`framework/dist/build-tools/compiler.js`), **không chép `.lua`**. Script Lua phải nằm trong file `.ts` (chuỗi hằng).
 
 **Quyết định cho plan hot-stock:** đồng bộ nghe `inventory-level.*` và `reservation-item.*`, đọc bản đã xoá bằng `withDeleted`; Lua nhúng trong `.ts`; nhánh hết hàng của D4 vẫn phải tự hoàn tiền vì ở thời điểm đó Postgres còn hàng (món chỉ đang được giữ trong Redis) nên Medusa không tự hoàn; IPN của phiên đã bị thay ghi nhận là rủi ro.
+
+## HS-4 — Giữ hàng (API-14)
+
+- **Kho của sales channel:** `query.graph` không có entity `sales_channel_stock_location` (`Service with alias ... was not found`); đọc `sales_channel` với field `stock_locations.id`.
+- **Thêm vào giỏ đã kiểm tồn Postgres:** tạo giỏ hoặc thêm dòng nhiều hơn `stocked − reserved` trả 400. Món chỉ có thể thiếu trong Redis khi giỏ khác đang giữ.
+- **Hai dòng cùng biến thể:** `POST /store/carts/:id/line-items` với `metadata` khác (ví dụ `prep`) tạo dòng riêng; workflow gộp theo inventory item trước khi giữ.
+- **Tạo đồng thời nhiều giỏ khách vãng lai cùng email** lỗi ở Medusa: `400 Customer with email ... already exists` hoặc `500 unknown_error`. Không liên quan hot-stock; test dùng email riêng mỗi giỏ.
+- **Lỗi CONFLICT có `code` riêng** vẫn phải tự trả 409 trong route (như BE-4), vì error handler ghi đè `code`.
