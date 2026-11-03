@@ -5,5 +5,5 @@ export const TEST_OPTIONS: VnpayOptions = {
   tmnCode: "TESTTMN1",
   hashSecret: "test-hash-secret-not-real",
   payUrl: "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html",
-  returnUrl: "http://localhost:8000/checkout/vnpay-return",
+  returnUrl: "http://localhost:8000/vn/checkout/vnpay-return",
 }
