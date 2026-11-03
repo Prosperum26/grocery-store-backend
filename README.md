@@ -23,6 +23,7 @@ apps/backend/
   src/workflows/      one workflow per feature; routes only run workflows
   src/subscribers/    order stage subscribers
   src/modules/vnpay/  VNPAY payment provider
+  src/modules/hot-stock/  Redis stock holds before payment (in progress)
   src/search/         product search index (in_stock, VND prices)
   src/lib/            plain functions with unit tests (stages, slots, vouchers, ETA, reorder, dashboard)
   src/lib/seed/       store bootstrap, catalog, promotions, demo data
@@ -39,7 +40,7 @@ tools/                Python scripts that build seed data and contract fixtures
 
 - Node.js `^20.19.0 || >=22.12.0`
 - npm 10.9.8 (pinned in `package.json`). Newer npm works for running scripts; use `npx npm@10.9.8 install ...` when adding packages so the lockfile stays stable.
-- Docker (for PostgreSQL 16 with pgvector)
+- Docker (PostgreSQL 16 with pgvector, Redis Stack 7.2)
 - Python 3.11+ with `pandas` and `openpyxl`, only if you rebuild the catalog data
 
 ### 1. Install
@@ -61,6 +62,16 @@ docker run -d --name com4fud-postgres \
 
 After a reboot: `docker start com4fud-postgres`.
 
+### 2b. Start Redis
+
+The hot-stock module holds stock in Redis before payment; the backend does not start without it.
+
+```bash
+docker run -d --name com4fud-redis -p 6379:6379 -e REDIS_ARGS="--appendonly yes" \n  -v com4fud-redisdata:/data --restart unless-stopped redis/redis-stack-server:7.2.0-v10
+```
+
+After a reboot: `docker start com4fud-postgres com4fud-redis`. Integration tests use the same Redis with the key prefix `c4f-test:`.
+
 ### 3. Environment
 
 ```bash
@@ -73,6 +84,7 @@ In `apps/backend/.env` set at least:
 | Variable | Value |
 | :--- | :--- |
 | `DATABASE_URL` | `postgres://postgres:<password>@localhost:5434/medusa-backend` |
+| `REDIS_URL` | `redis://localhost:6379` (the default when unset) |
 | `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET` | Sandbox credentials, or dummy values such as `TESTTMN1` / `test-hash-secret-not-real`. **The backend does not start without them.** |
 | `DEMO_PASSWORD` | Shared password of the demo accounts; leave empty to skip demo data |
 

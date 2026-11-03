@@ -13,7 +13,7 @@
 | Task | Nội dung | Phụ thuộc | Trạng thái |
 | :--- | :--- | :--- | :--- |
 | HS-0 | Spike: kiểm các hành vi Medusa mà plan dựa vào | | [x] Xong · kết quả ở `verified-apis.md` mục HS-0 |
-| HS-1 | Redis, `ioredis`, khung module `hot-stock` | HS-0 | [ ] |
+| HS-1 | Redis, `ioredis`, khung module `hot-stock` | HS-0 | [x] Xong · xem task HS-1 |
 | HS-2 | Chuyển 3 script Lua vào module, sửa lỗi, test jest | HS-1 | [ ] |
 | HS-3 | Bản sao tồn kho trong Redis: dựng từ Postgres, đồng bộ, đối soát | HS-2 | [ ] |
 | HS-4 | Workflow và route giữ hàng (API-14) | HS-3 | [ ] |
@@ -156,9 +156,9 @@ Rủi ro chưa xử lý được gom ở [`docs/known-risks.md`](../known-risks.
 
 **Xong khi:** `npm run backend:dev` có Redis thì khởi động bình thường, không có thì báo lỗi rõ (D8); test kiểm `service.ping()`.
 
-- [ ] Container: `docker run -d --name com4fud-redis -p 6379:6379 -v com4fud-redisdata:/data --restart unless-stopped redis/redis-stack-server:7.2.0-v10` với AOF (`REDIS_ARGS="--appendonly yes"`). Kiểm tag có thật trước khi ghi vào README.
-- [ ] `npx npm@10.9.8 install ioredis@5.11.1 --workspace=@dtc/backend` (cùng bản Medusa đang dùng; **không** dùng `^6.0.0` của repo thử).
-- [ ] Đăng ký module `./src/modules/hot-stock` với options `{ redisUrl, prefix, holdTtlSeconds: 900, locationName: "Kho Q.7" }`; test dùng prefix riêng và xoá key theo prefix sau mỗi suite.
+- [x] Container: `docker run -d --name com4fud-redis -p 6379:6379 -v com4fud-redisdata:/data --restart unless-stopped redis/redis-stack-server:7.2.0-v10` với AOF (`REDIS_ARGS="--appendonly yes"`). Tag đã pull được, Redis 7.2.4, `appendonly yes`; README mục 2b.
+- [x] `npx npm@10.9.8 install ioredis@5.11.1 --workspace=@dtc/backend` (cùng bản Medusa đang dùng; **không** dùng `^6.0.0` của repo thử).
+- [x] Module `hotStock` (`src/modules/hot-stock`): loader mở một kết nối `ioredis` và ping, lỗi thì Medusa dừng khởi động (đã thử khi tắt container); không dùng `__hooks.onApplicationStart` vì Medusa nuốt lỗi của hook này. Options `{ redisUrl, prefix }` (`holdTtlSeconds` mặc định 900); `NODE_ENV=test` dùng tiền tố `c4f-test:` (tham số `env` của test runner không tới được `medusa-config`). `locationName` để HS-3. Xoá key theo tiền tố làm ở HS-2 khi có key.
 - [ ] Commit `feat(hot-stock): redis connection and module skeleton`.
 
 ## Task HS-2: Script Lua
