@@ -3,12 +3,15 @@ import {
   defineSearchIndex,
   graphConsume,
   graphSeed,
+  InventoryLevelWorkflowEvents,
+  ReservationItemWorkflowEvents,
   search,
 } from "@medusajs/framework/utils";
 
 import { ProductOptionRow, toOptionValues } from "./helpers/option-values";
 import { loadPricing, priceFields, toProductPricing } from "./helpers/pricing";
 import { resolveProductIds } from "./helpers/resolve-product-ids";
+import { inStock, loadAvailability, VariantAvailability } from "./helpers/stock";
 
 const PRODUCT_GRAPH_FIELDS = [
   "id",
@@ -60,6 +63,8 @@ const productFields = search.define({
     .filterable()
     .facetable()
     .retrievable(),
+  // Còn hàng khi có biến thể không quản kho hoặc còn tồn khả dụng (helpers/stock.ts).
+  in_stock: search.boolean().filterable().facetable().retrievable(),
   ...priceFields,
 });
 
@@ -70,6 +75,7 @@ type ProductDocument = SearchTypes.InferSearchDocumentType<
 function toDocument(
   product: ProductRow,
   pricing: Parameters<typeof toProductPricing>[0],
+  availability: VariantAvailability[],
 ): ProductDocument {
   const category = (product.categories ?? [])
     .map((productCategory) => productCategory?.name?.trim())
@@ -93,6 +99,7 @@ function toDocument(
     category,
     labels,
     option_values: toOptionValues(product.options),
+    in_stock: inStock(availability),
     ...toProductPricing(pricing),
   };
 }
@@ -108,12 +115,15 @@ const source = {
     rows: ProductRow[],
     context: SearchTypes.SearchIngestionContext,
   ) => {
-    const pricing = await loadPricing(
-      rows.map((row) => row.id),
-      context,
-    );
+    const ids = rows.map((row) => row.id);
+    const [pricing, availability] = await Promise.all([
+      loadPricing(ids, context),
+      loadAvailability(ids, context),
+    ]);
 
-    return rows.map((row) => toDocument(row, pricing.get(row.id)));
+    return rows.map((row) =>
+      toDocument(row, pricing.get(row.id), availability.get(row.id) ?? []),
+    );
   },
 };
 
@@ -121,6 +131,9 @@ const source = {
  * Everything a document is built from, so a change to any of it re-indexes the
  * products it touches. Only `product.deleted` removes documents: a deleted
  * variant, option, tag or category means the product has to be re-read.
+ *
+ * Inventory level and reservation events change `in_stock`; they carry the
+ * level or reservation id, which `resolveProductIds` maps back to products.
  *
  * TODO: price lists emit no events (create, update, delete, batch prices).
  * TODO: price lists crossing their start or end date change prices silently.
@@ -145,6 +158,12 @@ const PRODUCT_EVENTS = [
   "product-category.updated",
   "product-category.deleted",
   "sales-channel.deleted",
+  InventoryLevelWorkflowEvents.CREATED,
+  InventoryLevelWorkflowEvents.UPDATED,
+  InventoryLevelWorkflowEvents.DELETED,
+  ReservationItemWorkflowEvents.CREATED,
+  ReservationItemWorkflowEvents.UPDATED,
+  ReservationItemWorkflowEvents.DELETED,
 ];
 
 export default defineSearchIndex({
