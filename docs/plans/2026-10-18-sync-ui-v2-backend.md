@@ -13,18 +13,20 @@
 
 | Task | Nội dung | Ưu tiên | Phụ thuộc | Trạng thái |
 | :--- | :--- | :---: | :--- | :--- |
-| BE-1 | Region VND, kho Q.7, tắt dữ liệu mẫu áo quần | P0 | | [ ] |
-| BE-2 | Seed catalog thực phẩm + khách demo + đơn demo | P0 | BE-1 | [ ] |
-| BE-3 | Tìm kiếm/lọc: `in_stock`, `on_sale_vnd`, đúng category | P0 | BE-2 | [ ] |
-| BE-4 | Khung giờ giao (`/store/delivery-slots`) + phí giao | P1 | BE-1 | [ ] |
-| BE-5 | Thanh toán chỉ VNPAY (provider tạm) + mã `TUOI20` | P1 | BE-1 | [ ] |
-| BE-6 | Trạng thái đơn `metadata.stage` + subscriber | P1 | BE-2 | [ ] |
-| BE-7 | Bắt đầu giao: workflow + widget Admin + ước giờ tới | P1 | BE-6 | [ ] |
-| BE-8 | Khách tự hủy đơn khi còn "Chờ xác nhận" | P2 | BE-6 | [ ] |
-| BE-9 | Stub `reorder-basket` và `warm` | P2 | BE-2 | [ ] |
-| BE-10 | Hợp đồng Trợ lý Bếp / Công thức (chỉ kiểu dữ liệu + fixture) | P2 | | [ ] |
-| BE-11 | Admin: Việt hóa, widget Tổng quan, widget Sắp cạn kho | P3 | BE-2 | [ ] |
-| BE-12 | Dọn dẹp, cập nhật `.env.template`, README | P3 | tất cả | [ ] |
+| BE-1 | Region VND, kho Q.7, tắt dữ liệu mẫu áo quần | P0 | | [x] Xong · `1bd9761`, `d721719` |
+| BE-2 | Seed catalog thực phẩm + khách demo + đơn demo | P0 | BE-1 | [x] Xong · catalog v2 2.129 món `4791bd1`, `7cff854`; khách/admin/đơn demo `43b0265`. Ảnh sản phẩm (BE-2b) hoãn: thiếu ảnh hệ thống vẫn chạy, FE hiện ảnh giữ chỗ |
+| BE-3 | Tìm kiếm/lọc: `in_stock`, `on_sale_vnd`, đúng category | P0 | BE-2 | [x] Xong · `63e2ee5`, `0efdbef`, `f72353c` |
+| BE-4 | Khung giờ giao (`/store/delivery-slots`) + phí giao | P1 | BE-1 | [x] Xong · `241b090`, `8d54c17` (khác plan: phí cố định 15.000đ, slot không còn là shipping option) |
+| BE-5 | Thanh toán chỉ VNPAY (provider tạm) + mã `TUOI20` | P1 | BE-1 | [~] Một phần · VNPAY thật `84a51c7`, `3a67d5f`, `902aec8`; mã giảm giá `73c1d05`, `a23122c`; chưa thanh toán thử trên sandbox VNPAY |
+| BE-6 | Trạng thái đơn `metadata.stage` + subscriber | P1 | BE-2 | [x] Xong · `2672d88`, `7c4e1fa`, `a1635ae` (chưa có nút "Xác nhận" trong Admin, chỉ có route) |
+| BE-7 | Bắt đầu giao: workflow + widget Admin + ước giờ tới | P1 | BE-6 | [x] Xong · `a86c183`, `f676dbc`; widget có ô tên tài xế và biển số, `metadata.delivery` đủ 6 trường API-7; đã kiểm trong Admin 28/10 (đơn #6). FE còn phải đọc `metadata.delivery.driver_name`/`plate` thay cho tài xế mẫu |
+| BE-8 | Khách tự hủy đơn khi còn "Chờ xác nhận" | P2 | BE-6 | [~] Một phần · `c509fb0`; chưa gọi API hoàn tiền sandbox VNPAY thật, chưa xử lý mã `94`/lỗi mạng khi hoàn |
+| BE-9 | Stub `reorder-basket` và `warm` | P2 | BE-2 | [x] Xong · `51a300d`; xếp theo tần suất trong đơn DELIVERED, bản tạm cho module Predictive |
+| BE-10 | Hợp đồng Trợ lý Bếp / Công thức (chỉ kiểu dữ liệu + fixture) | P2 | | [x] Xong · `41df2eb`; `src/types/assistant.ts`, `docs/contracts/assistant-recipes.md`, ví dụ từ dữ liệu thật; hai route kiểm body rồi trả 501 cho tới khi nối AI service |
+| BE-11 | Admin: Việt hóa, widget Tổng quan, widget Sắp cạn kho | P3 | BE-2 | [x] Xong · `4b11660`, `4848531`; widget Tổng quan (Đơn hàng), Sắp cạn kho (Tồn kho), API-9, dịch nhóm nút tùy chỉnh bố cục; đã kiểm trên trình duyệt 29/10. Màu: phương án A (chỉ widget của nhóm). Tiếng Việt chọn ở Profile; widget đưa lên trên bảng bằng Tùy chỉnh trang |
+| BE-12 | Dọn dẹp, cập nhật `.env.template`, README | P3 | tất cả | [x] Xong · `1b9bda9`, `e8bf3c9`, `410c712`, `cbc4763`, `0660846`; xoá seed áo quần và route mẫu, test chạy được trên Windows (`cross-env`), README tiếng Anh, bảng API đồng bộ route thật |
+
+Ký hiệu: `[x]` xong và đã kiểm · `[~]` code và test xong nhưng còn bước kiểm tay hoặc phần thiếu · `[ ]` chưa làm. Cập nhật 2026-10-28, đối chiếu với code và nhật ký tiến độ của người làm backend; chi tiết từng task ở nhật ký đó và `docs/contracts/verified-apis.md`.
 
 Ưu tiên tính cho **giai đoạn 2**: P0 = FE không chạy được với dữ liệu thật nếu thiếu. P1 = luồng mua hàng đầy đủ. P2/P3 = có thể để sau, FE vẫn dùng khối giữ chỗ. Trong #11 không task nào bắt buộc.
 
@@ -65,23 +67,27 @@ Mọi route `/store/*` cần `x-publishable-api-key`; route của khách cần t
 
 | ID | Route | Trạng thái | Response / ghi chú |
 | :--- | :--- | :--- | :--- |
-| API-1 | `GET /store/products` | Medusa | Thêm `fields=+metadata,+variants.inventory_quantity,+variants.weight`. FE tính giá gốc/giá bán từ `calculated_price`. |
-| API-2 | `POST /store/search` | Medusa Search (cấu hình ở BE-3) | Lọc `category`, `in_stock: true`, `on_sale_vnd: true`; sắp xếp. Hình dạng body chốt ở BE-3 rồi ghi lại tại đây. |
-| API-3 | `GET /store/predictive/reorder-basket` | Mới (stub ở BE-9) | `{ status: "ready"\|"warming"\|"empty", items: [{ variant_id, product_id, title, unit_label, art, tint, quantity, unit_price, in_stock }], total }`. **Không** trả xác suất, chu kỳ, lý do. |
+| API-1 | `GET /store/products` | Medusa (+ `allowFields` ở BE-3a) | Thêm `fields=+metadata,+variants.inventory_quantity,+variants.weight`; danh mục: `+categories.handle` (cùng `id`, `name`) hoặc `*categories`. FE tính giá gốc/giá bán từ `calculated_price`. Sản phẩm ẩn (`draft`) không trả về. |
+| API-2 | `POST /store/search` | Medusa Search, provider postgres có sẵn (BE-3) | Body: `{ entity: "product", filters?: { q?, category?, in_stock?, on_sale_vnd? }, pagination?: { take? (<=100), skip?, order?: { min_price_vnd: "ASC"\|"DESC" } } }` (hoặc `{ queries: [...] }`). `category` là **tên** danh mục ("Rau củ"); `q` tìm không dấu. Trả `{ results: [{ hits: [{ id, document }], metadata: { count, skip, take } }] }`. Trường không có trong index trả 400 `Unknown field`. Chi tiết: `verified-apis.md` S1, BE-3. |
+| API-3 | `GET /store/predictive/reorder-basket` (cần khách đăng nhập) | Stub ở BE-9 | `{ status: "ready"\|"warming"\|"empty", items: [{ variant_id, product_id, handle, title, unit_label, art, tint, quantity, unit_price, in_stock }], total }`. Tối đa 5 món; `unit_price` là giá đang tính (gồm khuyến mãi); `in_stock` = còn đủ `quantity`; `total` chỉ cộng món còn hàng (số tiền của nút "Thêm tất cả"). Stub không trả `warming`; `art`/`tint` có thể `null`. **Không** trả xác suất, chu kỳ, lý do. |
 | API-3b | `POST /store/predictive/warm` | Mới (stub ở BE-9) | `202 {}`; không chờ. |
-| API-4 | `GET /store/delivery-slots?cart_id=` | Mới (BE-4) | `{ slots: [{ id, label, day_label, shipping_option_id, fee, closed, note }] }`. FE chọn slot rồi thêm shipping method thường với `option_id = shipping_option_id`. |
-| API-5 | `order.metadata` | Mới (BE-6) | `stage`: `PENDING\|CONFIRMED\|PREPARING\|SHIPPING\|DELIVERED\|CANCELLED`; `stage_log`: `[{ stage, at }]` (ISO). FE đọc trực tiếp, **không tự suy ra** từ trạng thái Medusa. |
-| API-6 | `POST /store/orders/:id/cancel` | Mới (BE-8) | `200 { order }`; `409` nếu `stage != PENDING`. |
-| API-7 | `order.metadata.delivery` | Mới (BE-7) | `{ driver_name, plate, distance_km, eta_at, started_at, notice_sent_at }`; chỉ có từ lúc `SHIPPING`. |
-| API-8 | `POST /store/recipes/semantic-search`, `POST /store/assistant/chat` | Hợp đồng ở BE-10, cài đặt thật ở repo AI | Xem kiểu `Recipe`, `MealPlan`, `AssistantReply` ở BE-10. |
-| API-9 | `GET /admin/dashboard/summary` | Mới (BE-11) | `{ revenue_today, orders_today, aov, low_stock_count, revenue_7d: number[] }`. |
+| API-4 | `GET /store/delivery-slots` (không còn `cart_id`: phí giao cố định 15.000đ) | Mới (BE-4) | `{ slots: [{ id, label, startsAt, endsAt, fee, available }] }`, `id` dạng `2026-10-27T07` (giờ VN). FE chọn slot bằng `POST /store/carts/:id/delivery-slot` body `{ slot_id }` → ghi `cart.metadata.slot`; khung đã qua hoặc bắt đầu trong 60 phút tới → 409 `{ code: "SLOT_UNAVAILABLE" }`, id lạ hoặc giỏ lạ → 404. Slot không còn là shipping option; shipping method vẫn thêm bằng option "Giao tận nhà". Chi tiết ở plan 2026-10-25, task BE-4. |
+| API-5 | `order.metadata` | Mới (BE-6) | `stage`: `PENDING\|CONFIRMED\|PREPARING\|SHIPPING\|DELIVERED\|CANCELLED`; `stage_log`: `[{ stage, at, by }]` (`at` ISO; `by` là id admin, `seed` hoặc `backfill` nếu có). `code`: mã hiển thị. Đơn đặt từ giỏ được gán `C4F-YYMMDD-NNNN` (ngày đặt theo giờ VN, `display_id` đủ 4 số) ngay sau `order.placed`, bất đồng bộ như `stage`; đơn demo giữ mã của seed. FE đọc trực tiếp, **không tự suy ra** từ trạng thái Medusa; đổi stage do subscriber chạy bất đồng bộ nên đọc lại đơn sau khi thao tác. |
+| API-6 | `POST /store/orders/:id/cancel` (cần khách đăng nhập) | BE-8 | `200 { order: { id, status: "canceled" } }` sau khi hoàn tiền thành công (stage `CANCELLED` do subscriber đặt, đọc lại đơn); `409 { code: "ORDER_NOT_CANCELLABLE" }` khi `stage != PENDING`, đã huỷ hoặc còn fulfillment; `502 { code: "REFUND_FAILED" }` khi hoàn tiền lỗi (đơn giữ nguyên); `404` đơn lạ hoặc của khách khác; `401` chưa đăng nhập. |
+| API-7 | `order.metadata.delivery` | BE-7 | `{ driver_name, plate, distance_km, eta_at, started_at, notice_sent_at }`; chỉ có từ lúc `SHIPPING`. Ghi bởi `POST /admin/orders/:id/start-delivery` body `{ driver_name, plate }` (thiếu → 400; đơn không ở `PREPARING` → 409). |
+| API-8 | `POST /store/recipes/semantic-search`, `POST /store/assistant/chat` | Giữ chỗ ở BE-10 (kiểm body, trả `501 IN_DEVELOPMENT`); cài đặt thật cần AI service | Body và response: `src/types/assistant.ts`, giải thích ở `docs/contracts/assistant-recipes.md`. |
+| API-9 | `GET /admin/dashboard/summary` (+ `GET /admin/dashboard/low-stock?limit=`) | BE-11 | `{ revenue_today, orders_today, aov, low_stock_count, revenue_7d: number[] }`. Ngày theo giờ VN, theo ngày tạo đơn, bỏ đơn huỷ và nháp; `aov` là trung bình 7 ngày; `revenue_7d` cũ nhất trước. low-stock: `{ items: [{ product_id, title, variant_title, sku, available, low_stock }], count }`, tồn khả dụng <= `low_stock` (gồm hết hàng). |
+| API-10 | `GET /store/customers/me/vouchers` (cần khách đăng nhập) | BE-5b | `{ vouchers: [{ code, title, description, discountLabel, minSubtotal, endsAt, status: "usable"\|"not_eligible"\|"expired" }] }`: mã công khai và mã nhóm khách thuộc. Áp mã vào giỏ dùng route Medusa `POST /store/carts/:id/promotions`; mã chưa đủ điều kiện vẫn 200 nên phải đọc lại `discount_total`, chỉ mã không tồn tại mới 4xx. |
+| API-11 | `GET /store/vnpay/verify-return?<vnp_*>` | BE-5a | `{ valid, success }`: chỉ kiểm chữ ký và `vnp_ResponseCode` để trang return hiển thị; không đổi đơn. |
+| API-12 | `GET /hooks/vnpay/ipn?<vnp_*>` | BE-5a | Chỉ VNPAY gọi. Luôn HTTP 200 `{ RspCode, Message }` (00, 01, 02, 04, 97, 99); thanh toán hợp lệ thì Medusa tạo đơn từ giỏ. |
+| API-13 | `POST /admin/orders/:id/confirm` | BE-6 | `PENDING` → `CONFIRMED`; đơn không ở `PENDING` → 400, đơn lạ → 404. Nút "Xác nhận đơn" nằm trong Admin (widget `order-confirm.tsx`, cột bên của trang đơn, chỉ hiện khi đơn ở `PENDING`, có hộp hỏi lại). Sau khi xác nhận, khách không tự hủy được nữa (API-6 trả 409). |
 
 **Ánh xạ trạng thái đơn (đề xuất để đóng Q5 ở `docs/06`):**
 
 | `stage` (UI) | Điều kiện Medusa | Nguồn sự kiện |
 | :--- | :--- | :--- |
-| `PENDING` Chờ xác nhận | Đơn vừa đặt, chưa thanh toán xong | `order.placed` |
-| `CONFIRMED` Đã xác nhận | Thanh toán thành công (`payment.captured`) | `payment.captured` |
+| `PENDING` Chờ xác nhận | Đơn vừa đặt. Đơn chỉ tồn tại sau khi VNPAY đã thu tiền (giỏ hoàn tất sau thanh toán), nên đơn `PENDING` đã thanh toán và chờ cửa hàng xác nhận | `order.placed` |
+| `CONFIRMED` Đã xác nhận | Cửa hàng bấm "Xác nhận đơn" trong Admin | `POST /admin/orders/:id/confirm` (API-13). **Khác bản đầu của kế hoạch** (`payment.captured`): sự kiện đó phát ra trước khi đơn tồn tại nên không tìm thấy đơn, và nếu tự chuyển `CONFIRMED` khi đặt đơn thì khách không hủy được đơn nào |
 | `PREPARING` Đang chuẩn bị | Fulfillment được tạo | `order.fulfillment_created` |
 | `SHIPPING` Đang giao | Shipment được tạo | `shipment.created` |
 | `DELIVERED` Đã giao | Fulfillment được đánh dấu đã giao | `delivery.created` |
@@ -210,11 +216,11 @@ Mọi route `/store/*` cần `x-publishable-api-key`; route của khách cần t
 
 **Xong khi:** từ Admin bấm "Bắt đầu giao" trên đơn đang `PREPARING`, nhập tên tài xế và biển số; đơn chuyển `SHIPPING`, có `delivery.eta_at` và `distance_km`; `notice_sent_at` được ghi (tức là "thông báo đã gửi").
 
-- [ ] Quyết định O5 và O2. Bảng khoảng cách phường/quận → km nằm ngay trong `delivery-estimate.ts`, kèm comment nguồn. Ví dụ thiết kế: Sky Garden, Q.7, 2,4 km, tới 17:35.
-- [ ] Test unit `estimateDelivery` (ví dụ ở trên cho kết quả đúng; địa chỉ lạ dùng giá trị mặc định có cảnh báo, không ném lỗi).
-- [ ] Workflow: tạo shipment qua workflow lõi của Medusa, rồi đặt `stage = SHIPPING`, ghi `delivery`; có compensation (hoàn lại `stage`) khi bước tạo shipment lỗi.
-- [ ] Widget: form 2 ô + nút; chỉ hiện khi `stage === "PREPARING"`. Tra docs admin-sdk trước khi viết.
-- [ ] Đề xuất commit: `feat(delivery): start-delivery workflow with ETA and admin widget`
+- [x] Quyết định O5 và O2. Bảng km theo quận nằm trong `src/lib/delivery/estimate.ts` (không phải `delivery-estimate.ts`), 20 km/h, mặc định 6 km. Không gửi push, chỉ ghi `notice_sent_at`.
+- [x] Test unit `estimateDelivery` (Q.7 = 9 phút, Q.1 = 30 phút, quận lạ = 18 phút, không ném lỗi).
+- [x] Workflow: **khác plan:** `stage` do subscriber `shipment.created` (BE-6) đặt, workflow chỉ ghi `delivery` rồi tạo shipment; compensation khôi phục `metadata.delivery` (không phải `stage`).
+- [x] Widget: **khác plan:** `src/admin/widgets/order-start-delivery.tsx`, zone `order.details.side`, một nút "Bắt đầu giao" (không có form), nên `delivery` chưa có `driver_name` và `plate`.
+- [x] Commit: `a86c183` `feat(delivery): start-delivery workflow with ETA and admin widget`
 
 ## Task BE-8: Khách tự hủy đơn
 
@@ -224,9 +230,9 @@ Mọi route `/store/*` cần `x-publishable-api-key`; route của khách cần t
 
 **Xong khi:** gọi lúc `stage=PENDING` trả 200 và đơn sang `CANCELLED`; lúc `CONFIRMED` trở đi trả 409; đơn của khách khác trả 404.
 
-- [ ] Workflow bọc `cancelOrderWorkflow` của Medusa, kiểm tra quyền sở hữu và `stage`.
-- [ ] Test http cho 3 trường hợp trên.
-- [ ] Đề xuất commit: `feat(orders): customer cancel while pending`
+- [x] Workflow bọc `cancelOrderWorkflow` của Medusa, kiểm tra quyền sở hữu và `stage`. **Khác plan:** `cancelOrderWorkflow` không dừng khi hoàn tiền lỗi (`refundPaymentsStep` nuốt lỗi provider), nên workflow tự hoàn tiền bằng `refundPaymentsWorkflow` và kiểm lại trước khi huỷ; lỗi trả `502 REFUND_FAILED`. Thêm API hoàn tiền VNPAY (`refund-client.ts`) nối vào `VnpayProviderService.refundPayment`. Chi tiết ở `verified-apis.md` mục BE-8.
+- [x] Test http: 6 ca (huỷ được, `CONFIRMED` 409, đơn người khác 404, chưa đăng nhập 401, còn fulfillment 409, hoàn tiền lỗi 502), thêm 15 test unit cho refund. **Chưa gọi sandbox VNPAY thật.**
+- [x] Commit: `c509fb0` `feat(orders): customer cancel with VNPAY refund`
 
 ## Task BE-9: Stub `reorder-basket` và `warm`
 
@@ -272,11 +278,11 @@ Mọi route `/store/*` cần `x-publishable-api-key`; route của khách cần t
 
 ## Task BE-12: Dọn dẹp
 
-- [ ] Xóa `src/scripts/seed-demo-products.ts` (áo quần) và phần seed áo quần còn sót.
-- [ ] Cập nhật `.env.template` (`DEMO_PASSWORD`, các biến search nếu BE-3 thêm).
-- [ ] Cập nhật `README.md`: lệnh seed mới (`medusa exec ./src/scripts/seed-grocery.ts`).
-- [ ] Rà lại bảng API ở mục 3 so với route thật; đồng bộ sang file FE.
-- [ ] Đề xuất commit: `chore: remove apparel demo seed, update env template and README`
+- [x] Xóa `src/scripts/seed-demo-products.ts` (áo quần) và hai route mẫu `custom` (`1b9bda9`).
+- [x] Cập nhật `.env.template`: `DEMO_PASSWORD` có từ BE-2c; thêm ghi chú `REDIS_URL` chưa dùng, secret chỉ cho dev, dạng `DATABASE_URL`; bỏ script `storefront:dev` (`410c712`). BE-3 không thêm biến search nào.
+- [x] Script test chạy được trên Windows bằng `cross-env`; lock do npm 10.9.8 sinh (`e8bf3c9`).
+- [x] Cập nhật `README.md`: viết lại bằng tiếng Anh theo repo thật (npm, Docker Postgres, seed `npm run seed`) (`0660846`).
+- [x] Rà bảng API mục 3 với route thật: sửa API-1, 2, 5, 6, 7; thêm API-10 đến 13. File FE không có bảng hợp đồng riêng (chỉ bảng giữ chỗ ở mục 4, vẫn đúng).
 
 ## 5. Cách chia đôi công việc khi sync dở
 
@@ -290,4 +296,14 @@ Mọi route `/store/*` cần `x-publishable-api-key`; route của khách cần t
 
 | Ngày | Người | Đã xong | Dở dang / lưu ý |
 | :--- | :--- | :--- | :--- |
+| 2026-11-03 | | Câu 11, 13 của plan FE (mục 2b): đơn mới có `metadata.code` `C4F-YYMMDD-NNNN` (`src/workflows/assign-order-code.ts`, subscriber `order-code-placed.ts`, cùng khoá với set-order-stage để hai subscriber của `order.placed` không ghi đè metadata của nhau); `VNPAY_RETURN_URL` mặc định thêm `/vn` (`medusa-config.ts`, `options.ts`, `.env.template`). Unit 113 test, integration xem commit | `.env` đã tạo từ template trước đây vẫn giữ URL cũ (vẫn chạy nhờ middleware FE tự thêm `/vn`), sửa tay nếu muốn. Đơn thật đặt trước thay đổi này không có mã, FE hiện `#display_id` |
+| 2026-11-03 | | Thêm nút "Xác nhận đơn" vào Admin (`src/admin/widgets/order-confirm.tsx`, zone `order.details.side`): chỉ hiện khi `metadata.stage = PENDING`, hỏi lại rồi gọi API-13. `tsc` của admin và eslint sạch. Chốt: `PENDING` = đã thanh toán, chờ cửa hàng; `CONFIRMED` do Admin bấm (xem bảng stage) | Chưa bấm thử trên trình duyệt Admin (cần mật khẩu admin); API-13 đã có test ở `order-stage.spec.ts`. VNPAY sandbox: refund và querydr trả `99` cho mọi yêu cầu, cần hỏi VNPAY |
+| 2026-10-29 | | BE-12 xong (`0660846`); integration 15 suite / 58 test pass khi chạy từ PowerShell. 10/12 task xong | Còn BE-5, BE-8: thanh toán và hoàn tiền trên VNPAY sandbox thật. Ngoài plan BE: BE-2b (ảnh), đợt 4 đấu FE |
+| 2026-10-29 | | BE-11 xong (`4848531`), đã kiểm trên trình duyệt | Medusa 2.21 xếp widget sau bảng chính, sắp lại bằng Tùy chỉnh trang (lưu trong DB); còn BE-12, VNPAY sandbox (BE-5, BE-8) |
+| 2026-10-29 | | BE-11 code xong (`4b11660`); integration 15 suite / 58 test, unit 110 pass | Xem widget Tổng quan và Sắp cạn kho trên trình duyệt; BE-12; VNPAY sandbox (BE-5, BE-8) |
+| 2026-10-29 | | BE-10 xong (`41df2eb`); integration 14 suite / 57 test pass. Nhóm chốt: BE-2b làm sau, FE thêm 3 ô danh mục | Gửi hợp đồng cho nhóm AI (câu hỏi A1–A4); còn VNPAY sandbox (BE-5, BE-8), BE-11, BE-12 |
+| 2026-10-28 | | BE-7 xong (`f676dbc`): tài xế và biển số khi bắt đầu giao, kiểm trong Admin trên đơn #6; integration 13 suite / 56 test pass | FE: trang theo dõi đơn đổi `SAMPLE_DRIVER` sang `order.metadata.delivery`; còn VNPAY sandbox (BE-5, BE-8), BE-10, BE-11, BE-12 |
+| 2026-10-28 | | BE-9 xong (`51a300d`); BE-7 đã kiểm nút trong Admin | BE-7 còn `driver_name`/`plate`; VNPAY sandbox (BE-5, BE-8); BE-10, BE-11, BE-12 |
+| 2026-10-28 | | BE-2 xong: catalog v2 (2.129 món, 11 danh mục, 3 sản phẩm ẩn) và khách/admin/7 đơn demo (`43b0265`); integration 11 suite cũ pass (53 test) và seed-demo.spec pass khi chạy riêng | BE-2b (ảnh) hoãn; còn thử VNPAY sandbox, xem nút Bắt đầu giao trong Admin, BE-9 đến BE-12 |
+| 2026-10-28 | | BE-1, BE-3, BE-4, BE-6 xong; BE-2, BE-5, BE-7, BE-8 xong phần code (commit cuối `2c11113`) | Thanh toán và hoàn tiền thử trên sandbox VNPAY; xem nút "Bắt đầu giao" trong Admin; khách/đơn demo (BE-2c); BE-9 đến BE-12 chưa làm |
 | 2026-10-18 | | Chưa bắt đầu, mới có kế hoạch | |

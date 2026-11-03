@@ -68,6 +68,28 @@ async function productIdsInSalesChannels(
 }
 
 /**
+ * The products behind inventory items: an item is linked to the variants that
+ * consume it, and each variant belongs to a product.
+ */
+async function productIdsOfInventoryItems(
+  query: RemoteQueryFunction,
+  inventoryItemIds: string[],
+): Promise<string[]> {
+  if (!inventoryItemIds.length) {
+    return [];
+  }
+
+  return relatedProductIds(
+    query,
+    "inventory_item",
+    ["variants.product_id"],
+    inventoryItemIds,
+    (row) => (row.variants ?? []).map((variant: any) => variant?.product_id),
+    false,
+  );
+}
+
+/**
  * The products an event affects. A product event carries them directly; an
  * event about a variant, option, tag, category or sales channel is mapped to
  * the products behind it.
@@ -132,6 +154,30 @@ export async function resolveProductIds(
         ids,
         (row) => (row.products ?? []).map((product: any) => product?.id),
         deleted,
+      );
+    case "inventory-level":
+      return productIdsOfInventoryItems(
+        query,
+        await relatedProductIds(
+          query,
+          "inventory_level",
+          ["inventory_item_id"],
+          ids,
+          (row) => [row.inventory_item_id],
+          deleted,
+        ),
+      );
+    case "reservation-item":
+      return productIdsOfInventoryItems(
+        query,
+        await relatedProductIds(
+          query,
+          "reservation_item",
+          ["inventory_item_id"],
+          ids,
+          (row) => [row.inventory_item_id],
+          deleted,
+        ),
       );
     case "sales-channel":
       return productIdsInSalesChannels(query, ids);
