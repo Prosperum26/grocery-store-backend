@@ -33,8 +33,16 @@ type HoldCommands = {
   c4fReserveHold(numKeys: number, ...args: (string | number)[]): Promise<[number, number]>
   c4fReleaseHold(numKeys: number, ...args: (string | number)[]): Promise<number>
   c4fConfirmHold(numKeys: number, ...args: (string | number)[]): Promise<number>
-  c4fSyncItem(numKeys: number, ...args: (string | number)[]): Promise<number>
+  c4fSyncItem(numKeys: number, ...args: (string | number)[]): Promise<[number, number, number]>
 }
+
+/** Một món cần đặt lại: `postgres_available` = stocked − reserved của inventory level. */
+export type SyncEntry = { ref: StockRef; postgres_available: number }
+/** Kết quả đặt lại theo lô: `created` = món chưa có key, `changed` = món có key nhưng số khác (lệch). */
+export type SyncSummary = { synced: number; created: number; changed: number }
+
+// Số lệnh đặt lại gửi trong một pipeline (2.129 món của catalog = 5 lượt).
+const SYNC_BATCH = 500
 
 /**
  * Cổng giữ hàng bằng Redis (docs/plans/2026-11-03-redis-hot-stock.md). Mọi thay đổi số tồn chạy trong
@@ -144,7 +152,35 @@ export default class HotStockModuleService {
 
   /** Đặt lại số còn giữ được của một món từ `stocked − reserved` của Postgres. Trả avail mới. */
   async syncItem(ref: StockRef, postgresAvailable: number): Promise<number> {
-    return this.redis.c4fSyncItem(2, this.keys.avail(ref), this.keys.held(ref), postgresAvailable)
+    const [avail] = await this.redis.c4fSyncItem(2, this.keys.avail(ref), this.keys.held(ref), postgresAvailable)
+    return avail
+  }
+
+  /**
+   * Đặt lại nhiều món, gửi theo pipeline. Mỗi món vẫn là một lần chạy script riêng (nguyên tử theo món);
+   * pipeline chỉ gộp đường truyền. Đếm món mới và món bị lệch để job đối soát ghi log.
+   */
+  async syncItems(entries: SyncEntry[]): Promise<SyncSummary> {
+    const summary: SyncSummary = { synced: 0, created: 0, changed: 0 }
+    for (let i = 0; i < entries.length; i += SYNC_BATCH) {
+      const pipeline = this.redis.pipeline() as unknown as HoldCommands & { exec(): Promise<[Error | null, unknown][] | null> }
+      for (const { ref, postgres_available } of entries.slice(i, i + SYNC_BATCH)) {
+        pipeline.c4fSyncItem(2, this.keys.avail(ref), this.keys.held(ref), postgres_available)
+      }
+      for (const [error, reply] of (await pipeline.exec()) ?? []) {
+        if (error) {
+          throw error
+        }
+        const [avail, existed, old] = reply as [number, number, number]
+        summary.synced++
+        if (!existed) {
+          summary.created++
+        } else if (old !== avail) {
+          summary.changed++
+        }
+      }
+    }
+    return summary
   }
 
   /** Số còn giữ được của các món (null = chưa đồng bộ). */

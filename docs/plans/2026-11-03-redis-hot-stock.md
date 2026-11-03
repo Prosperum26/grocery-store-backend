@@ -15,7 +15,7 @@
 | HS-0 | Spike: kiểm các hành vi Medusa mà plan dựa vào | | [x] Xong · kết quả ở `verified-apis.md` mục HS-0 |
 | HS-1 | Redis, `ioredis`, khung module `hot-stock` | HS-0 | [x] Xong · xem task HS-1 |
 | HS-2 | Chuyển 3 script Lua vào module, sửa lỗi, test jest | HS-1 | [x] Xong · 29 test trên Redis thật (`npm run test:integration:modules`) |
-| HS-3 | Bản sao tồn kho trong Redis: dựng từ Postgres, đồng bộ, đối soát | HS-2 | [ ] |
+| HS-3 | Bản sao tồn kho trong Redis: dựng từ Postgres, đồng bộ, đối soát | HS-2 | [x] Xong · 7 test http, dựng 2.129 món trên DB dev |
 | HS-4 | Workflow và route giữ hàng (API-14) | HS-3 | [ ] |
 | HS-5 | Vòng đời hold: xác nhận khi có đơn, hết hạn | HS-4 | [ ] |
 | HS-6 | VNPAY: link 10 phút, nhả khi thất bại, lưới an toàn khi IPN tới muộn | HS-5 | [ ] |
@@ -182,11 +182,12 @@ Rủi ro chưa xử lý được gom ở [`docs/known-risks.md`](../known-risks.
 
 **Xong khi:** sau seed, mọi item có key đúng `stocked − reserved`; admin sửa tồn trong Admin thì key đổi trong vài giây; hủy đơn thì key tăng lại; test đối chiếu Redis với Postgres.
 
-- [ ] Workflow `sync-hot-stock` nhận `inventory_item_ids` (hoặc rỗng = toàn bộ), đọc inventory level tại Kho Q.7 bằng `query.graph`, chạy `sync_item` theo lô.
-- [ ] Subscriber `inventory-level.created/updated/deleted` (tra level theo id, `withDeleted` khi xoá) và `reservation-item.created/updated/deleted` (tra reservation theo id, `withDeleted`) → đặt lại item đó. Không tra được thì đặt lại toàn bộ.
-- [ ] Job đối soát 15 phút; ghi log số item lệch (bằng chứng cho báo cáo về TR-01).
-- [ ] Script `npx medusa exec ./src/scripts/rebuild-hot-stock.ts`; seed gọi cuối cùng.
-- [ ] Commit `feat(hot-stock): mirror available stock from postgres`.
+- [x] Workflow `sync-hot-stock` nhận `inventory_item_ids` (bỏ trống = toàn bộ) và `removed` (level đã xoá, đặt về 0), đọc inventory level bằng `query.graph`, gọi `syncItems` (pipeline 500 lệnh một lượt, mỗi món vẫn một lần chạy script). **Khác plan:** đồng bộ mọi kho chứ không chỉ Kho Q.7 (key đã có `location_id`, hiện chỉ có một kho), nên module không cần option `locationName`.
+- [x] Subscriber `inventory-level.created/updated/deleted` (tra level theo id, `withDeleted` khi xoá) và `reservation-item.created/updated/deleted` (tra reservation theo id, `withDeleted`) → đặt lại item đó. Không tra được thì đặt lại toàn bộ.
+- [x] Job đối soát 15 phút (`src/jobs/reconcile-hot-stock.ts`); `sync_item` trả cả số cũ nên job ghi log số món lệch và số món thiếu key (bằng chứng cho báo cáo về TR-01).
+- [x] Script `npx medusa exec ./src/scripts/rebuild-hot-stock.ts` (DB dev: 2.129 món, khoảng 11 giây gồm cả khởi động); seed gọi ở cuối, sau đơn demo.
+- [x] Test http (`hot-stock.spec.ts`): seed tự đẩy tồn qua subscriber và dựng lại không lệch; admin sửa tồn trừ phần đang giữ; đặt đơn rồi huỷ đơn; xoá level (đường `withDeleted`); job đối soát sửa key lệch; dựng lại sau khi mất hết key.
+- [x] Commit `feat(hot-stock): mirror available stock from postgres`.
 
 ## Task HS-4: Giữ hàng (API-14)
 

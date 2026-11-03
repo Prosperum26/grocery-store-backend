@@ -371,6 +371,21 @@ describe("expireDue: hết hạn giữ chỗ", () => {
 })
 
 describe("syncItem: đặt lại từ Postgres", () => {
+  it("syncItems theo lô: đếm món mới và món bị lệch, trừ phần đang giữ", async () => {
+    await seed({ A: 5, B: 5 })
+    await svc.reserve({ cart_id: "c1", lines: [line("A", 2)] })
+    await r.set(svc.keys.avail(ref("B")), 99) // giả lập lệch
+    const entries = [
+      { ref: ref("A"), postgres_available: 5 },
+      { ref: ref("B"), postgres_available: 5 },
+      { ref: ref("C"), postgres_available: 7 },
+      ...Array.from({ length: 1200 }, (_, i) => ({ ref: ref(`N${i}`), postgres_available: i })),
+    ]
+    expect(await svc.syncItems(entries)).toEqual({ synced: 1203, created: 1201, changed: 1 })
+    expect(await avail("A", "B", "C", "N1199")).toEqual([3, 5, 7, 1199])
+    expect(await svc.syncItems(entries)).toEqual({ synced: 1203, created: 0, changed: 0 })
+  })
+
   it("avail = tồn Postgres − phần đang giữ", async () => {
     await seed({ A: 10 })
     await svc.reserve({ cart_id: "c1", lines: [line("A", 3)] })

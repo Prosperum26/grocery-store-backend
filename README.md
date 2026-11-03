@@ -72,6 +72,8 @@ docker run -d --name com4fud-redis -p 6379:6379 -e REDIS_ARGS="--appendonly yes"
 
 After a reboot: `docker start com4fud-postgres com4fud-redis`. Integration tests use the same Redis with the key prefix `c4f-test:`.
 
+Seeding copies stock levels into Redis at the end. If Redis was emptied (new container, `FLUSHALL`), rebuild the stock keys from Postgres: `npx medusa exec ./src/scripts/rebuild-hot-stock.ts` in `apps/backend`. A job also reconciles Redis with Postgres every 15 minutes.
+
 ### 3. Environment
 
 ```bash
@@ -108,7 +110,7 @@ npm run backend:dev                       # http://localhost:9000, admin at /app
 
 ```bash
 npm run test:unit --workspace=@dtc/backend
-npm run test:integration:http --workspace=@dtc/backend   # needs the Postgres and Redis containers, about 6 minutes
+npm run test:integration:http --workspace=@dtc/backend   # needs the Postgres and Redis containers, about 10 minutes
 npm run test:integration:modules --workspace=@dtc/backend   # hot-stock Lua scripts against the Redis container, a few seconds
 cd apps/backend && npx tsc --noEmit
 ```
