@@ -114,6 +114,13 @@ medusaIntegrationTestRunner({
         // order.placed thật do completeCartWorkflow phát.
         await waitForStage(orderId, "PENDING")
 
+        // Subscriber thứ hai của order.placed gán mã hiển thị; cùng khoá nên không làm mất stage.
+        const [placed] = await graph({ entity: "order", fields: ["id", "display_id", "metadata"], filters: { id: orderId } })
+        await waitFor(async () => ((await orderMetadata(orderId)).code ? true : undefined), { timeoutMs: WAIT_MS })
+        const coded = await orderMetadata(orderId)
+        expect(coded.code).toMatch(new RegExp(`^C4F-\\d{6}-${String(placed.display_id).padStart(4, "0")}$`))
+        expect(coded.stage).toBe("PENDING")
+
         const confirmed = await api.post(`/admin/orders/${orderId}/confirm`, {}, admin)
         expect(confirmed.status).toBe(200)
         await waitForStage(orderId, "CONFIRMED")
@@ -181,15 +188,18 @@ medusaIntegrationTestRunner({
 
       it("createOrderWorkflow không phát order.placed: phát thủ công thì thành PENDING và giữ metadata cũ", async () => {
         const { createBareOrder } = await setup()
-        const orderId = await createBareOrder({ ghi_chu: "giu lai" })
+        const orderId = await createBareOrder({ ghi_chu: "giu lai", code: "C4F-DEMO-GIU" })
 
         await new Promise((resolve) => setTimeout(resolve, 1500))
         expect((await orderMetadata(orderId)).stage).toBeUndefined()
 
         await emit("order.placed", { id: orderId })
         await waitForStage(orderId, "PENDING")
+        // Chờ thêm cho subscriber gán mã chạy xong: đơn đã có mã (như đơn demo) thì giữ nguyên.
+        await new Promise((resolve) => setTimeout(resolve, 1500))
         const metadata = await orderMetadata(orderId)
         expect(metadata.ghi_chu).toBe("giu lai")
+        expect(metadata.code).toBe("C4F-DEMO-GIU")
         expect(metadata.stage_log).toHaveLength(1)
       })
 
