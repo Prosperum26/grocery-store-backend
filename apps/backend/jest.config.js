@@ -21,7 +21,8 @@ module.exports = {
 if (process.env.TEST_TYPE === "integration:http") {
   module.exports.testMatch = ["**/integration-tests/http/*.spec.[jt]s"];
 } else if (process.env.TEST_TYPE === "integration:modules") {
-  module.exports.testMatch = ["**/src/modules/*/__tests__/**/*.[jt]s"];
+  // Test module cần hạ tầng thật (Redis cho hot-stock); test *.unit.spec chạy ở TEST_TYPE=unit.
+  module.exports.testMatch = ["**/src/modules/*/__tests__/**/*.spec.[jt]s", "!**/*.unit.spec.[jt]s"];
 } else if (process.env.TEST_TYPE === "unit") {
   module.exports.testMatch = ["**/src/**/__tests__/**/*.unit.spec.[jt]s"];
 }

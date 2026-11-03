@@ -108,7 +108,8 @@ npm run backend:dev                       # http://localhost:9000, admin at /app
 
 ```bash
 npm run test:unit --workspace=@dtc/backend
-npm run test:integration:http --workspace=@dtc/backend   # needs the Postgres container, about 6 minutes
+npm run test:integration:http --workspace=@dtc/backend   # needs the Postgres and Redis containers, about 6 minutes
+npm run test:integration:modules --workspace=@dtc/backend   # hot-stock Lua scripts against the Redis container, a few seconds
 cd apps/backend && npx tsc --noEmit
 ```
 

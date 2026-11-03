@@ -14,7 +14,7 @@
 | :--- | :--- | :--- | :--- |
 | HS-0 | Spike: kiểm các hành vi Medusa mà plan dựa vào | | [x] Xong · kết quả ở `verified-apis.md` mục HS-0 |
 | HS-1 | Redis, `ioredis`, khung module `hot-stock` | HS-0 | [x] Xong · xem task HS-1 |
-| HS-2 | Chuyển 3 script Lua vào module, sửa lỗi, test jest | HS-1 | [ ] |
+| HS-2 | Chuyển 3 script Lua vào module, sửa lỗi, test jest | HS-1 | [x] Xong · 29 test trên Redis thật (`npm run test:integration:modules`) |
 | HS-3 | Bản sao tồn kho trong Redis: dựng từ Postgres, đồng bộ, đối soát | HS-2 | [ ] |
 | HS-4 | Workflow và route giữ hàng (API-14) | HS-3 | [ ] |
 | HS-5 | Vòng đời hold: xác nhận khi có đơn, hết hạn | HS-4 | [ ] |
@@ -167,13 +167,14 @@ Rủi ro chưa xử lý được gom ở [`docs/known-risks.md`](../known-risks.
 
 **Xong khi:** các test của repo thử (bước 1–3) chạy bằng jest trên Redis thật, cộng các ca mới dưới đây.
 
-- [ ] Chuyển `reserve_hold`, `release_hold`, `confirm_hold` từ `test-medusa-goc/apps/backend/src/redis-hold/lua`; giữ comment, giữ quy ước mã trả về (`1`, `0`, `-1`, `-2`, `-3`).
-- [ ] **Sửa 1 (D5):** hold đang `HELD` thì cộng trả rồi giữ lại theo giỏ mới; hold `RELEASED`/`EXPIRED` thì ghi đè; `CONFIRMED` trả `3`.
-- [ ] **Sửa 2:** `release_hold` nhận đủ key qua `KEYS` (không lấy tên key từ field rồi ghi), đúng quy tắc khai báo key của Redis.
-- [ ] Thêm bộ đếm `stock:held:*` trong cả 3 script; thêm `sync_item.lua` (mục 2.2).
-- [ ] Service nạp script một lần bằng `defineCommand`. Script là chuỗi hằng trong `lua/*.ts` (HS-0: `medusa build` không chép `.lua`); giữ định dạng nhiều dòng và comment để đọc được.
-- [ ] Test: 100 lần giữ đồng thời tranh 5 món × 20 lượt (đúng 5 thành công, `avail ≥ 0`); giỏ nhiều món tất cả hoặc không; giữ lại sau `EXPIRED` thì trừ lại thật; giữ lại khi giỏ đổi số lượng; confirm và release chạy đua; `expireDue` song song; `sync_item` chen giữa các lần giữ.
-- [ ] Commit `feat(hot-stock): atomic hold scripts ported from issue #9`.
+- [x] Chuyển `reserve_hold`, `release_hold`, `confirm_hold` từ `test-medusa-goc/apps/backend/src/redis-hold/lua`; giữ comment, giữ quy ước mã trả về (`1`, `0`, `-1`, `-2`, `-3`).
+- [x] **Sửa 1 (D5):** hold đang `HELD` thì cộng trả rồi giữ lại theo giỏ mới; hold `RELEASED`/`EXPIRED` thì ghi đè; `CONFIRMED` trả `3`.
+- [x] **Sửa 2:** `release_hold` nhận đủ key qua `KEYS` (không lấy tên key từ field rồi ghi), đúng quy tắc khai báo key của Redis.
+- [x] Thêm bộ đếm `stock:held:*` trong cả 3 script; thêm `sync_item.lua` (mục 2.2).
+- [x] Service nạp script một lần bằng `defineCommand`. Script là chuỗi hằng trong `lua/*.ts` (HS-0: `medusa build` không chép `.lua`); giữ định dạng nhiều dòng và comment để đọc được.
+- [x] Test: 100 lần giữ đồng thời tranh 5 món × 20 lượt (đúng 5 thành công, `avail ≥ 0`); giỏ nhiều món tất cả hoặc không; giữ lại sau `EXPIRED` thì trừ lại thật; giữ lại khi giỏ đổi số lượng; confirm và release chạy đua; `expireDue` song song; `sync_item` chen giữa các lần giữ.
+- [x] **Khác dự kiến:** để khai báo đủ key, service đọc hold cũ trước rồi truyền key của nó vào `KEYS`; script kiểm lại, hold vừa bị đổi thì trả `-4` và service đọc lại (tối đa 5 lần, nghỉ ngẫu nhiên vài ms). Dồn 30 lần sửa **cùng một giỏ** đồng thời thì vài lần có thể bỏ cuộc với lỗi `kept changing` (số tồn vẫn đúng); ngoài đời không xảy ra. Script nhận số lượng 0 cho món chỉ có trong hold cũ, nên service tự kiểm số lượng dòng mới > 0. `sync_item` để `avail` âm khi admin giảm tồn dưới phần đang giữ (không ai giữ thêm được), không ép về 0 vì sẽ làm sai phép cộng khi hold được trả. Test module chạy bằng `test:integration:modules` (đã sửa `testMatch` để bỏ `*.unit.spec` và file không phải test).
+- [x] Commit `feat(hot-stock): atomic hold scripts ported from issue #9`.
 
 ## Task HS-3: Bản sao tồn kho
 
