@@ -1,173 +1,158 @@
-# Com4Fud Backend
+<p align="center">
+  <a href="https://www.medusajs.com">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://user-images.githubusercontent.com/59018053/229103275-b5e482bb-4601-46e6-8142-244f531cebdb.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://user-images.githubusercontent.com/59018053/229103726-e5b529a3-9b3f-4970-8a1f-c6af37f087bf.svg">
+    <img alt="Medusa logo" src="https://user-images.githubusercontent.com/59018053/229103726-e5b529a3-9b3f-4970-8a1f-c6af37f087bf.svg">
+    </picture>
+  </a>
+</p>
+<h1 align="center">
+  Medusa DTC Starter
+</h1>
 
-Medusa 2.21.1 backend for **Com4Fud**, a Vietnamese grocery dark store (one brand, warehouse "Kho Q.7" in District 7, Ho Chi Minh City). Built for the MSIS4133 course project, team 05.
+<h4 align="center">
+  <a href="https://docs.medusajs.com">Documentation</a> |
+  <a href="https://www.medusajs.com">Website</a>
+</h4>
 
-Medusa handles the commerce core (catalog, prices, cart, orders, inventory, auth, admin). This repo adds:
+<p align="center">
+  Building blocks for digital commerce
+</p>
+<p align="center">
+  <a href="https://github.com/medusajs/medusa/blob/develop/LICENSE">
+    <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="Medusa is released under the MIT license." />
+  </a>
+  <a href="https://circleci.com/gh/medusajs/medusa">
+    <img src="https://circleci.com/gh/medusajs/medusa.svg?style=shield" alt="Current CircleCI build status." />
+  </a>
+  <a href="https://github.com/medusajs/medusa/blob/develop/CONTRIBUTING.md">
+    <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat" alt="PRs welcome!" />
+  </a>
+    <a href="https://www.producthunt.com/posts/medusa"><img src="https://img.shields.io/badge/Product%20Hunt-%231%20Product%20of%20the%20Day-%23DA552E" alt="Product Hunt"></a>
+  <a href="https://discord.gg/xpCwq3Kfn8">
+    <img src="https://img.shields.io/badge/chat-on%20discord-7289DA.svg" alt="Discord Chat" />
+  </a>
+  <a href="https://twitter.com/intent/follow?screen_name=medusajs">
+    <img src="https://img.shields.io/twitter/follow/medusajs.svg?label=Follow%20@medusajs" alt="Follow @medusajs" />
+  </a>
+</p>
 
-- VND region, a 2,129-product grocery catalog in 11 categories, demo customers and orders
-- Product search with "in stock" and "on sale" filters (Medusa Search, Postgres provider)
-- Delivery time slots with a flat 15,000đ fee
-- VNPAY as the only payment provider (signed payment URL, IPN, refunds)
-- Vouchers and a customer voucher wallet
-- Order stages (`PENDING → CONFIRMED → PREPARING → SHIPPING → DELIVERED`, or `CANCELLED`) driven by Medusa events, customer cancel with refund, "start delivery" with driver and ETA
-- "Buy it again" basket (frequency-based placeholder for the LightGBM module) and the kitchen assistant contract (routes return 501 until the AI service is connected)
-- Admin widgets: summary, low stock, delivery
+# Medusa DTC Starter
 
-The storefront lives in a separate repo (`grocery-store-frontend`, port 8000). The API contract both sides follow is section 3 of [`docs/plans/2026-10-18-sync-ui-v2-backend.md`](docs/plans/2026-10-18-sync-ui-v2-backend.md).
+A production-ready monorepo starter for direct-to-consumer ecommerce stores powered by Medusa and Next.js. Includes a fully featured storefront with product browsing, cart, checkout, customer accounts, and order management.
 
-## Repository layout
+## Features
 
-```text
-apps/backend/
-  src/api/            custom routes and middlewares.ts (body validation, auth, allowed fields)
-  src/workflows/      one workflow per feature; routes only run workflows
-  src/subscribers/    order stage subscribers
-  src/modules/vnpay/  VNPAY payment provider
-  src/search/         product search index (in_stock, VND prices)
-  src/lib/            plain functions with unit tests (stages, slots, vouchers, ETA, reorder, dashboard)
-  src/lib/seed/       store bootstrap, catalog, promotions, demo data
-  src/admin/          admin widgets and Vietnamese labels
-  integration-tests/  HTTP integration tests
-docs/contracts/       verified Medusa API facts, assistant contract and fixtures
-docs/plans/           task plan and API contract
-tools/                Python scripts that build seed data and contract fixtures
-```
+- All of [Medusa's commerce features](https://docs.medusajs.com/resources/commerce-modules)
+- Multi-region support with automatic country detection
+- Product catalog with variant selection
+- Cart with promotion codes
+- Multi-step checkout with shipping and payment
+- Customer accounts with order history and address management
+- Order transfer between accounts
 
-## Getting started
+## Getting Started
 
-### Prerequisites
+### Deploy with Medusa Cloud
 
-- Node.js `^20.19.0 || >=22.12.0`
-- npm 10.9.8 (pinned in `package.json`). Newer npm works for running scripts; use `npx npm@10.9.8 install ...` when adding packages so the lockfile stays stable.
-- Docker (for PostgreSQL 16 with pgvector)
-- Python 3.11+ with `pandas` and `openpyxl`, only if you rebuild the catalog data
+The fastest way to get started is deploying with [Medusa Cloud](https://cloud.medusajs.com):
 
-### 1. Install
+1. [Create a Medusa Cloud account](https://cloud.medusajs.com)
+2. Deploy this starter directly from your dashboard
+
+### Local Installation
+
+> **Prerequisites:
+>
+> - [Node.js](https://nodejs.org/) v20+
+> - [PostgreSQL](https://www.postgresql.org/) v15+
+> - [pnpm](https://pnpm.io/) v10+
+
+1. Clone the repository and install dependencies:
 
 ```bash
-git clone https://github.com/Prosperum26/grocery-store-backend.git
-cd grocery-store-backend
-npm install
+git clone https://github.com/medusajs/dtc-starter.git
+cd dtc-starter
+pnpm install
 ```
 
-### 2. Start PostgreSQL
-
-```bash
-docker run -d --name com4fud-postgres \
-  -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=<password> -e POSTGRES_DB=medusa-backend \
-  -p 5434:5432 -v com4fud-pgdata:/var/lib/postgresql/data --restart unless-stopped \
-  pgvector/pgvector:pg16
-```
-
-After a reboot: `docker start com4fud-postgres`.
-
-### 3. Environment
+2. Set up environment variables for the backend:
 
 ```bash
 cp apps/backend/.env.template apps/backend/.env
-cp apps/backend/.env.test.template apps/backend/.env.test
 ```
 
-In `apps/backend/.env` set at least:
+3. Set the database URL in `apps/backend.env`:
 
-| Variable | Value |
-| :--- | :--- |
-| `DATABASE_URL` | `postgres://postgres:<password>@localhost:5434/medusa-backend` |
-| `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET` | Sandbox credentials, or dummy values such as `TESTTMN1` / `test-hash-secret-not-real`. **The backend does not start without them.** |
-| `DEMO_PASSWORD` | Shared password of the demo accounts; leave empty to skip demo data |
+```bash
+# Replace with actual database URL, make sure the database exists.
+DATABASE_URL=postgres://postgres:@localhost:5432/medusa-dtc-starter
+```
 
-In `apps/backend/.env.test` set `DB_PORT=5434` and `DB_PASSWORD`; the test runner creates temporary databases on that server. Never commit `.env` or `.env.test`.
-
-### 4. Migrate, seed, run
+4. Run migrations:
 
 ```bash
 cd apps/backend
-npx medusa db:migrate
-cd ../..
-npm run seed --workspace=@dtc/backend     # about 15 minutes for 2,129 products
-npm run backend:dev                       # http://localhost:9000, admin at /app
+pnpm medusa db:migrate
 ```
 
-- The first `backend:dev` on a new database activates the search index and loads every product into it, which takes a few minutes. Until then `/store/search` returns errors, and seeding logs many harmless `not_found` lines from search ingestion.
-- Seeding prints the **publishable key**. Put it in `NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY` in the storefront's `.env.local` and restart the storefront. The key belongs to the database, so it changes whenever you recreate the database.
-- Admin user without demo data: `npx medusa user -e <email> -p <password>` in `apps/backend`.
-
-### 5. Tests and type check
+5. Add admin user:
 
 ```bash
-npm run test:unit --workspace=@dtc/backend
-npm run test:integration:http --workspace=@dtc/backend   # needs the Postgres container, about 6 minutes
-cd apps/backend && npx tsc --noEmit
+cd apps/backend
+pnpm medusa user -e admin@test.com -p supersecret
 ```
 
-The scripts use `cross-env`, so they run from PowerShell, cmd or bash. `tsc` reports errors on a fresh clone until the app has run once, because `tsconfig.json` includes the types Medusa generates in `.medusa/types`.
-
-## Seed data
-
-`npm run seed` is idempotent: records are looked up by handle, email or code, and existing ones are skipped. It never updates or deletes, so **changing the price, name or visibility of seeded products means recreating the database**:
+6. Start Medusa backend:
 
 ```bash
-docker exec com4fud-postgres psql -U postgres -c 'DROP DATABASE "medusa-backend" WITH (FORCE)' -c 'CREATE DATABASE "medusa-backend"'
-cd apps/backend && npx medusa db:migrate && cd ../..
-npm run seed --workspace=@dtc/backend
+cd apps/backend
+pnpm dev
 ```
 
-Recreating the database removes every admin user, the publishable key and admin layout settings.
+7. Open the admin dashboard at `localhost:9000/app` and log in. Retrieve your publishable API key at Settings > Publishable API key.
 
-### Store
-
-Region "Việt Nam" (VND, country `vn`), stock location "Kho Q.7", shipping option "Giao tận nhà" at 15,000đ, and VNPAY as the only payment provider. Medusa's own "Default Sales Channel" and publishable key are reused rather than duplicated.
-
-### Catalog
-
-`apps/backend/src/lib/seed/seed-data/catalog-v2.json`: 2,129 products in 11 categories, one variant each, `sku` = `catalog_id` (the id the AI service uses). Integration tests use the 32-product fixture in `seed-data/catalog.ts`, which is the default of `seedCatalog`.
-
-The JSON is generated from the team's `catalog_v2_updated.xlsx` (kept outside the repo):
+8. Set up environment variables for the storefront:
 
 ```bash
-python tools/catalog/build_catalog_v2.py <path>/catalog_v2_updated.xlsx [folder with recipes_v2.json]
+cp apps/storefront/.env.template apps/storefront/.env.local
 ```
 
-The script prints a report (hidden rows, renames, suspicious prices, missing units) and regenerates [`tools/catalog/hidden-products.md`](tools/catalog/hidden-products.md). Its docstring lists the rules for categories, hidden products, stock and sale prices. Products flagged in the `note_2` column, and exact duplicates, are seeded as `draft`: they stay in the database so AI lookups by `catalog_id` work, but the storefront and search never show them. Prices come from the team's estimate script, not market data. Product images are not part of the seed yet.
+9. Update `apps/storefront/.env.local` with your Medusa publishable API key:
 
-### Demo accounts and orders
+```bash
+NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY=pk_6c3...
+```
 
-Created when `DEMO_PASSWORD` is set. Data: `apps/backend/src/lib/seed/seed-data/demo.ts`.
+10.  Start storefront:
 
-| Account | Role |
-| :--- | :--- |
-| `hoangnam@com4fud.demo` | Admin |
-| `minhthu@com4fud.demo` | Customer in the "Thành viên" group, two District 7 addresses, 7 orders |
-| `khachmoi@com4fud.demo` | New customer, no orders, no group |
+```bash
+cd apps/storefront
+pnpm dev
+```
 
-`minhthu`'s orders (display code in `metadata.code`): five from the storefront mock (`C4F-261007-0142` SHIPPING, three DELIVERED, `C4F-260924-0207` CANCELLED), plus `C4F-DEMO-PENDING` to try customer cancel and `C4F-DEMO-PREPARING` to try "start delivery". Each order goes through the Medusa steps of its stage (reservation, payment, fulfillment, shipment, delivery).
+The storefront runs on `http://localhost:8000`.
 
-- Demo orders are paid through the system provider `pp_system_default`, not VNPAY, so cancelling one does not call the VNPAY refund API.
-- `created_at` is the seeding time (`createOrderWorkflow` takes no creation date); the mock dates are in `metadata.stage_log`.
-- Trying cancel or start delivery changes the demo orders; recreate the database to get them back.
+You can slo run the following command from the root to start both backend and storefront:
 
-### Vouchers
+```bash
+pnpm dev
+```
 
-`TUOI20` (20,000đ off orders from 150,000đ, public), `THANHVIEN15` (15,000đ, "Thành viên" group only), `HETHAN5` (expired). A code that does not meet its conditions still returns 200 when applied to a cart, so the storefront must read `discount_total` afterwards; only unknown codes return 4xx.
+## Configuration
 
-## VNPAY (sandbox)
+The storefront is configured via environment variables in `apps/storefront/.env.local`:
 
-- Credentials come in the sandbox.vnpayment.vn sign-up email; put them in `apps/backend/.env` only.
-- The IPN is `GET /hooks/vnpay/ipn` and needs a public HTTPS URL: in development, run a tunnel (cloudflared or ngrok to port 9000) and register `https://<tunnel>/hooks/vnpay/ipn` in the sandbox portal. Only the IPN changes payment state; `GET /store/vnpay/verify-return` just tells the return page what to show.
-- Not yet verified against the real sandbox: the payment signature encoding and the refund API. See `docs/contracts/verified-apis.md` (BE-5a, BE-8).
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY` | Publishable API key from your Medusa backend | — |
+| `NEXT_PUBLIC_MEDUSA_BACKEND_URL` | URL of your Medusa backend | `http://localhost:9000` |
+| `NEXT_PUBLIC_DEFAULT_REGION` | Default region country code | `dk` |
+| `NEXT_PUBLIC_BASE_URL` | Base URL of the storefront | `https://localhost:8000` |
+| `NEXT_PUBLIC_STRIPE_KEY` | Stripe publishable key (optional) | — |
 
-## Admin
+## Resources
 
-Open `http://localhost:9000/app`.
-
-- **Vietnamese:** the dashboard ships a Vietnamese translation but defaults to English and the default cannot be set from the server. Each user picks **Profile → Language → Tiếng Việt** once per browser (stored in localStorage `lng`). `src/admin/i18n/index.ts` adds the page-customizer labels missing from Medusa's `vi.json`.
-- **Widgets:** "Tổng quan" on the order list (`GET /admin/dashboard/summary`), "Sắp cạn kho" on the inventory list (`GET /admin/dashboard/low-stock`), "Giao hàng" in the order detail side column (`POST /admin/orders/:id/start-delivery`).
-- **Widget order:** since 2.21, list pages place widgets after the main table even for `*.list.before` zones. To move "Tổng quan" above the orders table: the customize icon (sliders) in the top bar → **Customize page** → drag the block up → save for yourself or **Save for everyone**. Layouts are stored in the database.
-- **Colors:** Medusa 2.21.1 has no admin color setting (the colors are hard-coded CSS variables in `@medusajs/dashboard`, and the admin CSS entry is regenerated on every build). Only the team's widgets use Com4Fud accent colors (`src/admin/lib/com4fud.ts`); the rest keeps Medusa's colors.
-
-## Further reading
-
-- [`AGENTS.md`](AGENTS.md): Medusa conventions for this repo
-- [`docs/contracts/verified-apis.md`](docs/contracts/verified-apis.md): Medusa 2.21.1 behavior checked by running it, per task
-- [`docs/contracts/assistant-recipes.md`](docs/contracts/assistant-recipes.md): kitchen assistant and recipe contract
-- [Medusa documentation](https://docs.medusajs.com)
+- [Medusa Documentation](https://docs.medusajs.com)
+- [Medusa Cloud](https://cloud.medusajs.com)
