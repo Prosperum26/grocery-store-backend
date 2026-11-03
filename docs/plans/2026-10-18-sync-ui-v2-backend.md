@@ -80,14 +80,14 @@ Mọi route `/store/*` cần `x-publishable-api-key`; route của khách cần t
 | API-10 | `GET /store/customers/me/vouchers` (cần khách đăng nhập) | BE-5b | `{ vouchers: [{ code, title, description, discountLabel, minSubtotal, endsAt, status: "usable"\|"not_eligible"\|"expired" }] }`: mã công khai và mã nhóm khách thuộc. Áp mã vào giỏ dùng route Medusa `POST /store/carts/:id/promotions`; mã chưa đủ điều kiện vẫn 200 nên phải đọc lại `discount_total`, chỉ mã không tồn tại mới 4xx. |
 | API-11 | `GET /store/vnpay/verify-return?<vnp_*>` | BE-5a | `{ valid, success }`: chỉ kiểm chữ ký và `vnp_ResponseCode` để trang return hiển thị; không đổi đơn. |
 | API-12 | `GET /hooks/vnpay/ipn?<vnp_*>` | BE-5a | Chỉ VNPAY gọi. Luôn HTTP 200 `{ RspCode, Message }` (00, 01, 02, 04, 97, 99); thanh toán hợp lệ thì Medusa tạo đơn từ giỏ. |
-| API-13 | `POST /admin/orders/:id/confirm` | BE-6 | `PENDING` → `CONFIRMED`; đơn không ở `PENDING` → 400, đơn lạ → 404. Chưa có nút trong Admin. |
+| API-13 | `POST /admin/orders/:id/confirm` | BE-6 | `PENDING` → `CONFIRMED`; đơn không ở `PENDING` → 400, đơn lạ → 404. Nút "Xác nhận đơn" nằm trong Admin (widget `order-confirm.tsx`, cột bên của trang đơn, chỉ hiện khi đơn ở `PENDING`, có hộp hỏi lại). Sau khi xác nhận, khách không tự hủy được nữa (API-6 trả 409). |
 
 **Ánh xạ trạng thái đơn (đề xuất để đóng Q5 ở `docs/06`):**
 
 | `stage` (UI) | Điều kiện Medusa | Nguồn sự kiện |
 | :--- | :--- | :--- |
-| `PENDING` Chờ xác nhận | Đơn vừa đặt, chưa thanh toán xong | `order.placed` |
-| `CONFIRMED` Đã xác nhận | Thanh toán thành công (`payment.captured`) | `payment.captured` |
+| `PENDING` Chờ xác nhận | Đơn vừa đặt. Đơn chỉ tồn tại sau khi VNPAY đã thu tiền (giỏ hoàn tất sau thanh toán), nên đơn `PENDING` đã thanh toán và chờ cửa hàng xác nhận | `order.placed` |
+| `CONFIRMED` Đã xác nhận | Cửa hàng bấm "Xác nhận đơn" trong Admin | `POST /admin/orders/:id/confirm` (API-13). **Khác bản đầu của kế hoạch** (`payment.captured`): sự kiện đó phát ra trước khi đơn tồn tại nên không tìm thấy đơn, và nếu tự chuyển `CONFIRMED` khi đặt đơn thì khách không hủy được đơn nào |
 | `PREPARING` Đang chuẩn bị | Fulfillment được tạo | `order.fulfillment_created` |
 | `SHIPPING` Đang giao | Shipment được tạo | `shipment.created` |
 | `DELIVERED` Đã giao | Fulfillment được đánh dấu đã giao | `delivery.created` |
@@ -296,6 +296,7 @@ Mọi route `/store/*` cần `x-publishable-api-key`; route của khách cần t
 
 | Ngày | Người | Đã xong | Dở dang / lưu ý |
 | :--- | :--- | :--- | :--- |
+| 2026-11-03 | | Thêm nút "Xác nhận đơn" vào Admin (`src/admin/widgets/order-confirm.tsx`, zone `order.details.side`): chỉ hiện khi `metadata.stage = PENDING`, hỏi lại rồi gọi API-13. `tsc` của admin và eslint sạch. Chốt: `PENDING` = đã thanh toán, chờ cửa hàng; `CONFIRMED` do Admin bấm (xem bảng stage) | Chưa bấm thử trên trình duyệt Admin (cần mật khẩu admin); API-13 đã có test ở `order-stage.spec.ts`. VNPAY sandbox: refund và querydr trả `99` cho mọi yêu cầu, cần hỏi VNPAY |
 | 2026-10-29 | | BE-12 xong (`0660846`); integration 15 suite / 58 test pass khi chạy từ PowerShell. 10/12 task xong | Còn BE-5, BE-8: thanh toán và hoàn tiền trên VNPAY sandbox thật. Ngoài plan BE: BE-2b (ảnh), đợt 4 đấu FE |
 | 2026-10-29 | | BE-11 xong (`4848531`), đã kiểm trên trình duyệt | Medusa 2.21 xếp widget sau bảng chính, sắp lại bằng Tùy chỉnh trang (lưu trong DB); còn BE-12, VNPAY sandbox (BE-5, BE-8) |
 | 2026-10-29 | | BE-11 code xong (`4b11660`); integration 15 suite / 58 test, unit 110 pass | Xem widget Tổng quan và Sắp cạn kho trên trình duyệt; BE-12; VNPAY sandbox (BE-5, BE-8) |
