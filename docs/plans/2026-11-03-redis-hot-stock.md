@@ -21,8 +21,8 @@
 | HS-6 | VNPAY: link 10 phút, nhả khi thất bại, lưới an toàn khi IPN tới muộn | HS-5 | [~] Code và test xong (IPN giả lập, API hoàn tiền giả lập bằng `jest.spyOn(fetch)`); chưa kiểm trên sandbox thật (D0) |
 | HS-7 | Thí nghiệm H4, đo P95, dàn ý `docs/hot-stock.md` | HS-6 | [x] Xong · số đo ở `docs/hot-stock-results.md` |
 | HS-8 | Pub/Sub → Socket.io gateway và `GET /store/stock` | HS-3 | [x] Xong · gateway `apps/realtime-gateway`, API-15, API-16 |
-| HS-9 | (Tùy chọn) Module Redis của Medusa: event bus, workflow engine, locking | HS-7 | [ ] |
-| HS-10 | Tài liệu: README, `.env.template`, bảng API, nhật ký | tất cả | [ ] |
+| HS-9 | (Tùy chọn) Module Redis của Medusa: event bus, workflow engine, locking | HS-7 | Hoãn (2026-11-04): backend chạy một tiến trình, chưa cần; xem task HS-9 và R7 |
+| HS-10 | Tài liệu: README, `.env.template`, bảng API, nhật ký | tất cả | [x] Xong · cập nhật theo từng task; nhật ký ngoài repo 2026-11-04 |
 
 Ký hiệu như plan `2026-10-18`: `[x]` xong và đã kiểm · `[~]` code và test xong nhưng còn phần kiểm tay · `[ ]` chưa làm.
 
@@ -252,14 +252,16 @@ Rủi ro chưa xử lý được gom ở [`docs/known-risks.md`](../known-risks.
 
 ## Task HS-9 (tùy chọn): Module Redis của Medusa
 
+**Hoãn (2026-11-04).** Chỉ cần khi chạy từ hai tiến trình Medusa trở lên (tách `server`/`worker`, hoặc nhiều bản sau load balancer). Một tiến trình thì khoá, event và job in-memory vẫn đúng. Khi cần: bật **locking Redis trước** (khoá IPN theo giỏ của HS-6, khoá stage/mã đơn phải có tác dụng giữa các tiến trình), rồi mới tới event bus và workflow engine (hàng đợi trong Redis phải tách theo từng lần chạy test, vì mỗi test tạo DB mới nhưng hàng đợi còn nguyên). Rủi ro R7 trong `docs/known-risks.md`.
+
 - [ ] Bật `@medusajs/medusa/event-bus-redis`, `workflow-engine-redis`, `locking` với provider `locking-redis` (đã có trong `node_modules`, tra docs 2.21.1 trước).
 - [ ] Chạy lại toàn bộ test unit và integration; kiểm subscriber BE-3, BE-6, IPN vẫn chạy (event bus Redis chạy bất đồng bộ qua hàng đợi).
 - [ ] Không qua được thì ghi lại lý do và bỏ, không chặn các task khác.
 
 ## Task HS-10: Tài liệu
 
-- [ ] README: container Redis, biến môi trường, `rebuild-hot-stock`, gateway; nói rõ teammate làm FE cần chạy thêm container Redis.
-- [ ] `.env.template`: bỏ dòng "Not used yet" của `REDIS_URL`, thêm `HOT_STOCK_PREFIX`, `REALTIME_PORT`.
-- [ ] Bảng API mục 3 của plan `2026-10-18`: thêm API-14 đến 16, sửa API-12.
-- [ ] `verified-apis.md` mục HS-x; nhật ký tiến độ ngoài repo.
-- [ ] Commit `docs: hot-stock and realtime setup`.
+- [x] README: container Redis, biến môi trường, `rebuild-hot-stock`, gateway; nói rõ teammate làm FE cần chạy thêm container Redis.
+- [x] `.env.template`: bỏ dòng "Not used yet" của `REDIS_URL`, thêm `HOT_STOCK_PREFIX`, `REALTIME_PORT`.
+- [x] Bảng API mục 3 của plan `2026-10-18`: thêm API-14 đến 16, sửa API-12.
+- [x] `verified-apis.md` mục HS-x; nhật ký tiến độ ngoài repo.
+- [x] Commit `docs: hot-stock and realtime setup`.
