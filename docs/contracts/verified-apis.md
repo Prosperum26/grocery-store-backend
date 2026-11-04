@@ -342,3 +342,13 @@ Chạy bằng một test tích hợp tạm (subscribe trực tiếp event bus, c
 - **Hai dòng cùng biến thể:** `POST /store/carts/:id/line-items` với `metadata` khác (ví dụ `prep`) tạo dòng riêng; workflow gộp theo inventory item trước khi giữ.
 - **Tạo đồng thời nhiều giỏ khách vãng lai cùng email** lỗi ở Medusa: `400 Customer with email ... already exists` hoặc `500 unknown_error`. Không liên quan hot-stock; test dùng email riêng mỗi giỏ.
 - **Lỗi CONFLICT có `code` riêng** vẫn phải tự trả 409 trong route (như BE-4), vì error handler ghi đè `code`.
+
+## HS-6 — IPN và cổng giữ hàng
+
+Chỉ chạy với VNPAY giả lập (D0): IPN ký bằng khóa thử, API hoàn tiền thay bằng `jest.spyOn(global, "fetch")` (test `inApp` chạy cùng tiến trình với Medusa, gọi API của test dùng axios nên không bị ảnh hưởng).
+
+- **Giỏ của phiên thanh toán:** `payment_session.payment_collection_id` → link `cart_payment_collection { cart_id }` (cùng cách compensation của Medusa dùng).
+- **`when(...).then(() => workflow.runAsStep(...))` trả về kết quả của workflow con** (hoặc `undefined` khi không chạy), dùng tiếp được trong `when` và `transform` sau.
+- **Khoá theo giỏ** (`acquireLockStep`, khoá in-memory) đủ để hai IPN cùng lúc cho giỏ hết hàng chỉ hoàn một lần: lần sau thấy `stock_failed` và trả `02`.
+- **Hoàn tất giỏ thiếu hàng sau khi thu tiền** (tái hiện R2 bằng cách giảm tồn Postgres dưới số đang giữ): Medusa gọi `refundPayment` của provider; VNPAY từ chối thì payment vẫn captured, không có refund, không có đơn. `query.graph` lọc được `captured_at: { $ne: null }`.
+- **Chưa kiểm:** chữ ký và mã trả lời thật của API hoàn tiền (chung với BE-8, R4).

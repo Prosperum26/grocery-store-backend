@@ -18,7 +18,7 @@
 | HS-3 | Bản sao tồn kho trong Redis: dựng từ Postgres, đồng bộ, đối soát | HS-2 | [x] Xong · 7 test http, dựng 2.129 món trên DB dev |
 | HS-4 | Workflow và route giữ hàng (API-14) | HS-3 | [x] Xong · 7 test http |
 | HS-5 | Vòng đời hold: xác nhận khi có đơn, hết hạn | HS-4 | [x] Xong · 5 test http |
-| HS-6 | VNPAY: link 10 phút, nhả khi thất bại, lưới an toàn khi IPN tới muộn | HS-5 | [ ] |
+| HS-6 | VNPAY: link 10 phút, nhả khi thất bại, lưới an toàn khi IPN tới muộn | HS-5 | [~] Code và test xong (IPN giả lập, API hoàn tiền giả lập bằng `jest.spyOn(fetch)`); chưa kiểm trên sandbox thật (D0) |
 | HS-7 | Thí nghiệm H4, đo P95, dàn ý `docs/hot-stock.md` | HS-6 | [ ] |
 | HS-8 | Pub/Sub → Socket.io gateway và `GET /store/stock` | HS-3 | [ ] |
 | HS-9 | (Tùy chọn) Module Redis của Medusa: event bus, workflow engine, locking | HS-7 | [ ] |
@@ -214,17 +214,17 @@ Rủi ro chưa xử lý được gom ở [`docs/known-risks.md`](../known-risks.
 
 ## Task HS-6: VNPAY
 
-**Files:** `src/modules/vnpay/lib/url.ts`, `src/api/hooks/vnpay/ipn/route.ts`, `src/workflows/guard-paid-cart-stock.ts`, `integration-tests/http/vnpay-ipn.spec.ts`.
+**Files:** `src/modules/vnpay/lib/url.ts`, `src/modules/vnpay/lib/original-payment.ts` (tách từ `service.ts`), `src/api/hooks/vnpay/ipn/route.ts`, `src/workflows/guard-paid-cart-stock.ts`, `src/workflows/release-cart-hold.ts`, `src/workflows/find-stuck-payments.ts`, `src/jobs/reconcile-hot-stock.ts`, `integration-tests/http/hot-stock-ipn.spec.ts`.
 
 **Xong khi:** các ca của API-12 (đổi) có test; test IPN cũ vẫn qua.
 
-- [ ] `EXPIRE_MS` 10 phút (D2); sửa test của `url.ts`.
-- [ ] Bước 5 của IPN (thanh toán không thành công): nhả hold của giỏ, vẫn trả `00`.
-- [ ] Bước 6 (thành công), trước khi phát event: workflow `guard-paid-cart-stock` (D4). Hết hàng thì hoàn tiền bằng `refund-client.ts` theo `vnp_transaction_no`, ghi `cart.metadata.stock_failed`, không phát event. IPN gửi lại thì đọc `stock_failed` và trả `02`. Phải tự hoàn vì lúc này chưa có payment trong Medusa và Postgres vẫn còn hàng (món chỉ đang giữ trong Redis), nên compensation của Medusa không chạy.
-- [ ] R2: sau khi phát event, nếu hoàn tất giỏ lỗi thì Medusa tự hoàn tiền nhưng nuốt lỗi. Job đối soát (HS-3) liệt kê payment `captured` không có đơn và không có refund, ghi log cảnh báo và `cart.metadata.payment_stuck` để Admin xử lý tay.
-- [ ] Test: thất bại thì nhả; thành công khi `HELD`; thành công sau khi hết hạn mà còn hàng; thành công sau khi hết hạn mà hết hàng (mock refund client) thì không có đơn; IPN gửi lặp.
-- [ ] Ghi chú trong `verified-apis.md`: phần hoàn tiền chung trạng thái "chưa kiểm sandbox" với BE-8.
-- [ ] Commit `feat(vnpay): hold-aware IPN and 10 minute payment link`.
+- [x] `EXPIRE_MS` 10 phút (D2); sửa test của `url.ts` và `service.ts`.
+- [x] Bước 5 của IPN (thanh toán không thành công): workflow `release-cart-hold` trả hàng, vẫn trả `00`. Giỏ của phiên tra qua link `cart_payment_collection`.
+- [x] Bước 6a (thành công, phiên chưa có dấu `paid`): workflow `guard-paid-cart-stock` chạy **trước** khi đánh dấu `paid`, có khoá theo giỏ (`hot-stock-ipn-{cart}`). Hold `HELD`/`CONFIRMED` thì đi tiếp; không còn thì chạy `reserveCartStockWorkflow.runAsStep`; hết hàng thì hoàn tiền bằng `requestVnpayRefund` (dữ liệu giao dịch gốc đọc bằng `readOriginalPayment`, tách khỏi provider để dùng chung với BE-8), ghi `cart.metadata.stock_failed { at, items, vnp_transaction_no, refund: "refunded"|"failed", refund_error? }` và trả `00` mà không đánh dấu `paid` (nên `complete` cũng không lấy được đơn). IPN gửi lại khi đã có `stock_failed` thì trả `02`.
+- [x] R2: workflow `find-stuck-payments` (chạy trong job đối soát 15 phút) tìm payment captured, không huỷ, không có refund, payment collection không có đơn, đã thu quá 10 phút; ghi `cart.metadata.payment_stuck { payment_id, amount, captured_at, detected_at }` một lần và log cảnh báo. Lọc `captured_at: { $ne: null }` chạy được với `query.graph`.
+- [x] Test (`hot-stock-ipn.spec.ts`, 7 ca): thất bại thì trả hàng; `HELD` thì tạo đơn, không hoàn; hết hạn mà còn hàng thì giữ lại và tạo đơn; hết hạn và giỏ khác giữ mất thì hoàn tiền, không đơn, hold của giỏ kia nguyên, `complete` không ra đơn, IPN lặp trả `02` và không hoàn lần hai; hai IPN cùng lúc chỉ hoàn một lần; VNPAY từ chối hoàn thì `refund: "failed"`; R2 (giữ 2, admin giảm tồn Postgres còn 1, Medusa hoàn lỗi) được đánh dấu, đơn bình thường không. 11 test IPN cũ vẫn qua (chúng chưa giữ hàng nên đi qua nhánh giữ lại).
+- [x] Ghi chú trong `verified-apis.md` mục HS-6: phần hoàn tiền chung trạng thái "chưa kiểm sandbox" với BE-8.
+- [x] Commit `feat(vnpay): hold-aware IPN and 10 minute payment link`.
 
 ## Task HS-7: Thí nghiệm và tài liệu cho báo cáo
 

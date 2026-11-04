@@ -6,16 +6,16 @@ const input = { txnRef: "paysesU01ABCU1", amountVnd: 390000, orderInfo: "Thanh t
 const paramsOf = (url: string) => Object.fromEntries(new URL(url).searchParams)
 
 describe("buildPaymentUrl", () => {
-  it("23:30 giờ VN: CreateDate theo UTC+7, ExpireDate sau 15 phút", () => {
+  it("23:30 giờ VN: CreateDate theo UTC+7, ExpireDate sau 10 phút", () => {
     const p = paramsOf(buildPaymentUrl(TEST_OPTIONS, input, new Date("2026-10-26T16:30:00Z")))
     expect(p.vnp_CreateDate).toBe("20261026233000")
-    expect(p.vnp_ExpireDate).toBe("20261026234500")
+    expect(p.vnp_ExpireDate).toBe("20261026234000")
   })
 
   it("hạn thanh toán vượt nửa đêm giờ VN sang ngày sau", () => {
     const p = paramsOf(buildPaymentUrl(TEST_OPTIONS, input, new Date("2026-10-26T16:50:00Z")))
     expect(p.vnp_CreateDate).toBe("20261026235000")
-    expect(p.vnp_ExpireDate).toBe("20261027000500")
+    expect(p.vnp_ExpireDate).toBe("20261027000000")
   })
 
   it("00:00:01 giờ VN đã sang ngày mới", () => {
