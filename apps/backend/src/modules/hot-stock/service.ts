@@ -53,12 +53,15 @@ export default class HotStockModuleService {
   readonly prefix: string
   readonly holdTtlSeconds: number
   readonly keys: HotStockKeys
+  /** Kênh Pub/Sub nhận `{ location_id, inventory_item_id, available }` mỗi khi số còn giữ được đổi (HS-8). */
+  readonly channel: string
 
   constructor(deps: InjectedDependencies, options: HotStockOptions) {
     this.redis = deps[REDIS_CLIENT] as Redis & HoldCommands
     this.prefix = options.prefix ?? "c4f:"
     this.holdTtlSeconds = options.holdTtlSeconds ?? 900
     this.keys = hotStockKeys(this.prefix)
+    this.channel = options.publish === false ? "" : `${this.prefix}channel:inventory_events`
     this.redis.defineCommand("c4fReserveHold", { lua: RESERVE_HOLD_LUA })
     this.redis.defineCommand("c4fReleaseHold", { lua: RELEASE_HOLD_LUA })
     this.redis.defineCommand("c4fConfirmHold", { lua: CONFIRM_HOLD_LUA })
@@ -98,6 +101,7 @@ export default class HotStockModuleService {
         cart_id,
         input.now ?? nowSeconds(),
         input.ttl ?? this.holdTtlSeconds,
+        this.channel,
         ...quantities
       )
       // detail là vị trí cặp (từ 1); cặp sau `lines` là món chỉ có trong hold cũ.
@@ -125,7 +129,7 @@ export default class HotStockModuleService {
 
   /** Trả hàng của hold (status RELEASED: thanh toán lỗi, khách bỏ; EXPIRED: job hết hạn). */
   async release(cartId: string, status: "RELEASED" | "EXPIRED" = "RELEASED"): Promise<"released" | "noop" | "confirmed"> {
-    const code = await this.runOnHold(cartId, (keys) => this.redis.c4fReleaseHold(keys.length, ...keys, cartId, status))
+    const code = await this.runOnHold(cartId, (keys) => this.redis.c4fReleaseHold(keys.length, ...keys, cartId, status, this.channel))
     return code === 1 ? "released" : code === -1 ? "confirmed" : "noop"
   }
 
@@ -152,7 +156,7 @@ export default class HotStockModuleService {
 
   /** Đặt lại số còn giữ được của một món từ `stocked − reserved` của Postgres. Trả avail mới. */
   async syncItem(ref: StockRef, postgresAvailable: number): Promise<number> {
-    const [avail] = await this.redis.c4fSyncItem(2, this.keys.avail(ref), this.keys.held(ref), postgresAvailable)
+    const [avail] = await this.redis.c4fSyncItem(2, this.keys.avail(ref), this.keys.held(ref), postgresAvailable, this.channel)
     return avail
   }
 
@@ -165,7 +169,7 @@ export default class HotStockModuleService {
     for (let i = 0; i < entries.length; i += SYNC_BATCH) {
       const pipeline = this.redis.pipeline() as unknown as HoldCommands & { exec(): Promise<[Error | null, unknown][] | null> }
       for (const { ref, postgres_available } of entries.slice(i, i + SYNC_BATCH)) {
-        pipeline.c4fSyncItem(2, this.keys.avail(ref), this.keys.held(ref), postgres_available)
+        pipeline.c4fSyncItem(2, this.keys.avail(ref), this.keys.held(ref), postgres_available, this.channel)
       }
       for (const [error, reply] of (await pipeline.exec()) ?? []) {
         if (error) {

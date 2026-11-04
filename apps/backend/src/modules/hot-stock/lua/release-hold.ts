@@ -3,9 +3,15 @@
 export const RELEASE_HOLD_LUA = `
 -- Trả hàng của một hold (thanh toán lỗi, khách bỏ, hoặc hết hạn). Gọi lại không trả lần hai.
 -- KEYS[1] = hold:{cart}   KEYS[2] = hold:expiry   KEYS[3..] = cặp (stock:avail, stock:held) của mọi món trong hold
--- ARGV[1] = cart id       ARGV[2] = trạng thái cuối: 'RELEASED' hoặc 'EXPIRED'
+-- ARGV[1] = cart id       ARGV[2] = trạng thái cuối: 'RELEASED' hoặc 'EXPIRED'   ARGV[3] = kênh Pub/Sub ('' = không phát)
 -- Trả về: 1 vừa trả hàng · 0 không làm gì (không có hold, hoặc đã RELEASED/EXPIRED)
 --         -1 hold đã CONFIRMED, không được trả · -2 tham số sai · -4 hold có món không nằm trong KEYS
+-- Phát số mới lên kênh Pub/Sub (HS-8). Tên kênh là ARGV vì kênh không phải key. Rỗng thì không phát.
+local function publish(channel, availKey, available)
+  if channel == '' then return end
+  local loc, item = string.match(availKey, 'stock:avail:([^:]+):([^:]+)$')
+  redis.call('PUBLISH', channel, cjson.encode({ location_id = loc, inventory_item_id = item, available = available }))
+end
 if ARGV[2] ~= 'RELEASED' and ARGV[2] ~= 'EXPIRED' then return -2 end
 local status = redis.call('HGET', KEYS[1], '__status')
 if not status then
@@ -26,7 +32,7 @@ for i = 1, #fields, 2 do
   local field = fields[i]
   if string.sub(field, 1, 2) ~= '__' then
     local qty = tonumber(fields[i + 1])
-    redis.call('INCRBY', field, qty)
+    publish(ARGV[3], field, redis.call('INCRBY', field, qty))
     redis.call('DECRBY', KEYS[2 + 2 * index[field]], qty)
   end
 end

@@ -20,7 +20,7 @@
 | HS-5 | Vòng đời hold: xác nhận khi có đơn, hết hạn | HS-4 | [x] Xong · 5 test http |
 | HS-6 | VNPAY: link 10 phút, nhả khi thất bại, lưới an toàn khi IPN tới muộn | HS-5 | [~] Code và test xong (IPN giả lập, API hoàn tiền giả lập bằng `jest.spyOn(fetch)`); chưa kiểm trên sandbox thật (D0) |
 | HS-7 | Thí nghiệm H4, đo P95, dàn ý `docs/hot-stock.md` | HS-6 | [x] Xong · số đo ở `docs/hot-stock-results.md` |
-| HS-8 | Pub/Sub → Socket.io gateway và `GET /store/stock` | HS-3 | [ ] |
+| HS-8 | Pub/Sub → Socket.io gateway và `GET /store/stock` | HS-3 | [x] Xong · gateway `apps/realtime-gateway`, API-15, API-16 |
 | HS-9 | (Tùy chọn) Module Redis của Medusa: event bus, workflow engine, locking | HS-7 | [ ] |
 | HS-10 | Tài liệu: README, `.env.template`, bảng API, nhật ký | tất cả | [ ] |
 
@@ -239,16 +239,16 @@ Rủi ro chưa xử lý được gom ở [`docs/known-risks.md`](../known-risks.
 
 ## Task HS-8: Pub/Sub → Socket.io
 
-**Files:** các script Lua (thêm `PUBLISH`), `src/api/store/stock/route.ts`, `apps/realtime-gateway/{package.json,src/index.ts}`, root `package.json` (script `gateway:dev`).
+**Files:** các script Lua (thêm `PUBLISH`), `src/api/store/stock/{route,validators}.ts`, `src/workflows/get-variant-stock.ts`, `src/lib/inventory/variant-stock.ts` (+ unit test), `apps/realtime-gateway/` (`src/rooms.ts`, `src/gateway.ts`, `src/index.ts` + test `node --test`), root `package.json` (`gateway:dev`).
 
 **Xong khi:** mở hai trình duyệt nhỏ (script test socket), một bên giữ hàng thì bên kia nhận `stock:update` với số mới; API-15 trả đúng số trong Redis.
 
-- [ ] Lua `PUBLISH channel:inventory_events` sau mỗi lần `avail` đổi (giữ, nhả, hết hạn, đặt lại). Đặt `stock:variant:*` trong `sync_item`.
-- [ ] API-15 (route chỉ chạy workflow đọc Redis, kiểm `variant_ids` bằng zod).
-- [ ] Gateway: `ioredis` subscriber + `socket.io` server cổng 4001, CORS lấy `STORE_CORS`, room `variant:{id}`, giới hạn 100 id mỗi lần subscribe. Ghim version `socket.io`.
-- [ ] Test: unit cho việc đổi tin nhắn Redis sang room; test tích hợp bằng `socket.io-client`.
-- [ ] Ghi hợp đồng API-15, API-16 cho FE (cài `socket.io-client`, biến `NEXT_PUBLIC_REALTIME_URL`, `LiveStock` nhận số mới).
-- [ ] Commit `feat(realtime): stock updates over socket.io`.
+- [x] Lua `PUBLISH` lên `{prefix}channel:inventory_events` (tên kênh qua ARGV, rỗng = không phát) ngay sau mỗi `DECRBY`/`INCRBY`/`SET` của `stock:avail`: giữ hàng (chỉ món đổi số), trả hàng, `sync_item` (chỉ khi số đổi, để đối soát 15 phút không làm ngập kênh). Tin nhắn `{ location_id, inventory_item_id, available }` mã hoá bằng `cjson`. **Khác plan:** không lưu `stock:variant:*`; FE lấy `inventory_item_id` từ API-15 rồi subscribe theo id đó, nên script không phải đọc thêm key.
+- [x] API-15 `GET /store/stock?variant_ids=`: `validateAndTransformQuery` + zod (1–100 id, bỏ trùng); workflow `get-variant-stock` lọc biến thể theo sales channel của publishable key, kho từ `sales_channel.stock_locations`, món chưa có key thì đặt lại từ Postgres (`syncItemsFromPostgres`, dùng chung với HS-4). Số của biến thể = nhỏ nhất qua các item của floor(avail / required_quantity), không âm; không quản kho thì `null`.
+- [x] Gateway `apps/realtime-gateway` (workspace `@dtc/realtime-gateway`): `ioredis` subscriber + `socket.io` 4.8.1, cổng `REALTIME_PORT` (4001), CORS từ `STORE_CORS`, phòng `stock:{inventory_item_id}`, tối đa 100 id mỗi lần subscribe, ack `{ ok, inventory_item_ids }` hoặc `{ ok: false, error }`. Chạy TypeScript trực tiếp bằng `node --experimental-strip-types` (không bước build); `npm run gateway:dev` từ root.
+- [x] Test: gateway 5 test (`npm test --workspace=@dtc/realtime-gateway`, Redis thật + `socket.io-client`): chỉ nhận món đã subscribe, unsubscribe, payload sai, tin nhắn hỏng. Backend: test module cho tin nhắn của từng script; 3 test http (API-15 trừ phần đang giữ, Redis trống, 400; giữ hàng qua API-14 thì có tin trên kênh); unit `variantStock`.
+- [x] Hợp đồng API-15, API-16 ở bảng API mục 3 của plan `2026-10-18`.
+- [x] Commit `feat(realtime): stock updates over socket.io`.
 
 ## Task HS-9 (tùy chọn): Module Redis của Medusa
 

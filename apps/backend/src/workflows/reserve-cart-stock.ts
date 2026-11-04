@@ -1,9 +1,8 @@
-import type { MedusaContainer } from "@medusajs/framework/types"
-import { ContainerRegistrationKeys, MedusaError } from "@medusajs/framework/utils"
+import { MedusaError } from "@medusajs/framework/utils"
 import { createStep, createWorkflow, StepResponse, transform, WorkflowResponse } from "@medusajs/framework/workflows-sdk"
 import { useQueryGraphStep } from "@medusajs/medusa/core-flows"
 import { cartHoldLines, type CartHoldLine, type CartItemForHold } from "../lib/inventory/cart-hold-lines"
-import { LEVEL_SYNC_FIELDS, levelSyncEntries, type LevelForSync } from "../lib/inventory/stock-levels"
+import { syncItemsFromPostgres } from "../lib/inventory/stock-levels"
 import { HOT_STOCK_MODULE } from "../modules/hot-stock"
 import type HotStockModuleService from "../modules/hot-stock/service"
 import type { ReserveResult } from "../modules/hot-stock/service"
@@ -40,16 +39,6 @@ const prepareCartHoldStep = createStep(
   }
 )
 
-// Redis chưa có key của món (khởi động lạnh, Redis vừa bị xoá): đọc level của các món này rồi đặt lại.
-async function syncFromPostgres(container: MedusaContainer, hotStock: HotStockModuleService, itemIds: string[]) {
-  const { data } = await container.resolve(ContainerRegistrationKeys.QUERY).graph({
-    entity: "inventory_level",
-    fields: LEVEL_SYNC_FIELDS,
-    filters: { inventory_item_id: itemIds },
-  })
-  await hotStock.syncItems(levelSyncEntries(data as LevelForSync[]))
-}
-
 // Món thiếu: so số cần với số còn giữ được cộng phần giỏ này đang giữ (giỏ giữ lại thì phần cũ được tính).
 async function shortagesOf(hotStock: HotStockModuleService, hold: PreparedHold): Promise<StockShortage[]> {
   const refs = hold.lines.map((line) => ({ location_id: hold.location_id, inventory_item_id: line.inventory_item_id }))
@@ -75,7 +64,7 @@ const reserveCartStockStep = createStep(
 
     let result: ReserveResult = await reserve()
     if (result.status === "missing_stock_key") {
-      await syncFromPostgres(container, hotStock, hold.lines.map((line) => line.inventory_item_id))
+      await syncItemsFromPostgres(container, hotStock, hold.lines.map((line) => line.inventory_item_id))
       result = await reserve()
     }
 

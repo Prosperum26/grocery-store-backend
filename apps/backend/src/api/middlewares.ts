@@ -4,16 +4,24 @@ import {
   configureStoreSearch,
   defineMiddlewares,
   validateAndTransformBody,
+  validateAndTransformQuery,
 } from '@medusajs/framework/http'
 import { StartDeliveryBody } from './admin/orders/[id]/start-delivery/validators'
 import { AssistantChatBody } from './store/assistant/chat/validators'
 import { SetDeliverySlotBody } from './store/carts/[id]/delivery-slot/validators'
 import { RecipeSearchBody } from './store/recipes/semantic-search/validators'
+import { StockQuery } from './store/stock/validators'
 
 // The product index declares filterable `status` and `sales_channel_ids`, so
 // the route narrows it to published products in the key's sales channels.
 export default defineMiddlewares({
   routes: [
+    // Tồn đã trừ phần đang giữ (hot-stock HS-8, API-15): ?variant_ids=a,b, 1–100 id.
+    {
+      method: ['GET'],
+      matcher: '/store/stock',
+      middlewares: [validateAndTransformQuery(StockQuery, {})],
+    },
     // Store API silently drops fields outside a route's `allowed` list.
     // No `method` key: allowFields must run for every method of the matcher.
     // `variants.metadata` already comes back via the default `*variants`; it is

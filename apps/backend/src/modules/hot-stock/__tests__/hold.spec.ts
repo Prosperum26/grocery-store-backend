@@ -415,3 +415,30 @@ describe("syncItem: đặt lại từ Postgres", () => {
     await expectInvariant(["A"])
   })
 })
+
+describe("Pub/Sub: phát số còn giữ được (HS-8)", () => {
+  it("giữ, trả, đặt lại khi số đổi thì phát { location_id, inventory_item_id, available }; số không đổi thì không phát", async () => {
+    await seed({ A: 5, B: 5 })
+    const sub = new Redis(REDIS_URL)
+    const messages: any[] = []
+    sub.on("message", (_channel, message) => messages.push(JSON.parse(message)))
+    await sub.subscribe(svc.channel)
+
+    await svc.reserve({ cart_id: "c1", lines: [line("A", 2), line("B", 1)] })
+    await svc.reserve({ cart_id: "c1", lines: [line("A", 2), line("B", 1)] }) // gọi lại y hệt: không đổi số
+    await svc.release("c1")
+    await svc.syncItem(ref("A"), 5) // số không đổi
+    await svc.syncItem(ref("A"), 9)
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    await sub.quit()
+
+    expect(svc.channel).toBe(`${PREFIX}channel:inventory_events`)
+    const msg = (item: string, available: number) => ({ location_id: LOC, inventory_item_id: item, available })
+    expect(messages).toHaveLength(5)
+    // Giữ hàng: theo thứ tự dòng của giỏ.
+    expect(messages.slice(0, 2)).toEqual([msg("A", 3), msg("B", 4)])
+    // Trả hàng: thứ tự theo field của hash, không cố định.
+    expect(messages.slice(2, 4)).toEqual(expect.arrayContaining([msg("A", 5), msg("B", 5)]))
+    expect(messages[4]).toEqual(msg("A", 9))
+  })
+})

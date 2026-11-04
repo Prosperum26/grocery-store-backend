@@ -12,6 +12,7 @@ Medusa handles the commerce core (catalog, prices, cart, orders, inventory, auth
 - Order stages (`PENDING → CONFIRMED → PREPARING → SHIPPING → DELIVERED`, or `CANCELLED`) driven by Medusa events, customer cancel with refund, "start delivery" with driver and ETA
 - "Buy it again" basket (frequency-based placeholder for the LightGBM module) and the kitchen assistant contract (routes return 501 until the AI service is connected)
 - Admin widgets: summary, low stock, delivery
+- Stock holds in Redis before payment (atomic Lua scripts) and live stock over Socket.io
 
 The storefront lives in a separate repo (`grocery-store-frontend`, port 8000). The API contract both sides follow is section 3 of [`docs/plans/2026-10-18-sync-ui-v2-backend.md`](docs/plans/2026-10-18-sync-ui-v2-backend.md).
 
@@ -23,7 +24,8 @@ apps/backend/
   src/workflows/      one workflow per feature; routes only run workflows
   src/subscribers/    order stage subscribers
   src/modules/vnpay/  VNPAY payment provider
-  src/modules/hot-stock/  Redis stock holds before payment (in progress)
+  src/modules/hot-stock/  Redis stock holds before payment
+apps/realtime-gateway/  Socket.io gateway for live stock (Redis Pub/Sub)
   src/search/         product search index (in_stock, VND prices)
   src/lib/            plain functions with unit tests (stages, slots, vouchers, ETA, reorder, dashboard)
   src/lib/seed/       store bootstrap, catalog, promotions, demo data
@@ -164,6 +166,17 @@ Created when `DEMO_PASSWORD` is set. Data: `apps/backend/src/lib/seed/seed-data/
 ### Vouchers
 
 `TUOI20` (20,000đ off orders from 150,000đ, public), `THANHVIEN15` (15,000đ, "Thành viên" group only), `HETHAN5` (expired). A code that does not meet its conditions still returns 200 when applied to a cart, so the storefront must read `discount_total` afterwards; only unknown codes return 4xx.
+
+## Real-time stock (Socket.io gateway)
+
+`apps/realtime-gateway` is a separate process on port 4001. The hot-stock Lua scripts publish every stock change to the Redis channel `c4f:channel:inventory_events`; the gateway forwards it to storefront clients subscribed to that inventory item.
+
+```bash
+npm run gateway:dev                                   # http://localhost:4001, reads apps/realtime-gateway/.env if present
+npm test --workspace=@dtc/realtime-gateway            # needs the Redis container
+```
+
+The storefront first calls `GET /store/stock?variant_ids=...` (API-15) for the current numbers and the `inventory_item_id` of each variant, then emits `subscribe { inventory_item_ids }` and listens to `stock:update`. The gateway runs TypeScript directly with `node --experimental-strip-types` (Node 22.12+), so it has no build step. Contract: API-15 and API-16 in the plan's API table.
 
 ## VNPAY (sandbox)
 

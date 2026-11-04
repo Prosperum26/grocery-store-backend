@@ -6,6 +6,8 @@ export type HotStockOptions = {
   prefix?: string
   /** Thời gian giữ hàng (giây). Mặc định 900 (15 phút, plan D2). */
   holdTtlSeconds?: number
+  /** Phát thay đổi tồn lên kênh Pub/Sub cho gateway real-time. Mặc định true. */
+  publish?: boolean
 }
 
 /** Tên đăng ký kết nối Redis trong container riêng của module (loader đặt, service đọc). */

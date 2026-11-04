@@ -1,4 +1,5 @@
 import { medusaIntegrationTestRunner } from "@medusajs/test-utils"
+import Redis from "ioredis"
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { updateInventoryLevelsWorkflow, updateRegionsWorkflow } from "@medusajs/medusa/core-flows"
 import { bootstrapStore } from "../../src/lib/seed/bootstrap-store"
@@ -167,6 +168,52 @@ medusaIntegrationTestRunner({
         expect(results.filter((r) => r.status === 200)).toHaveLength(5)
         expect(results.filter((r) => r.status === 409 && r.data.code === "OUT_OF_STOCK")).toHaveLength(15)
         expect(await ctx.avail(ctx.A)).toBe(0)
+      })
+    })
+
+    describe("GET /store/stock (API-15) và Pub/Sub (HS-8)", () => {
+      it("trả số đã trừ phần giỏ khác đang giữ, kèm inventory_item_id để subscribe; biến thể lạ bị bỏ qua", async () => {
+        const ctx = await setup()
+        await ctx.setStock(ctx.A, 5)
+        await ctx.setStock(ctx.B, 8)
+        const other = await ctx.newCart([{ variant_id: ctx.A.id, quantity: 2 }])
+        await ctx.reserve(other)
+
+        const { data } = await api.get(`/store/stock?variant_ids=${ctx.A.id},${ctx.B.id},variant_khong_co,${ctx.A.id}`, ctx.headers)
+        expect(data.stock).toEqual(
+          expect.arrayContaining([
+            { variant_id: ctx.A.id, inventory_item_id: ctx.refOf(ctx.A).inventory_item_id, location_id: ctx.store.stockLocationId, available: 3 },
+            { variant_id: ctx.B.id, inventory_item_id: ctx.refOf(ctx.B).inventory_item_id, location_id: ctx.store.stockLocationId, available: 8 },
+          ])
+        )
+        expect(data.stock).toHaveLength(2)
+      })
+
+      it("Redis trống: tự đặt lại từ Postgres; thiếu tham số hoặc quá 100 id thì 400", async () => {
+        const ctx = await setup()
+        await ctx.setStock(ctx.A, 6)
+        await clearRedis()
+        const { data } = await api.get(`/store/stock?variant_ids=${ctx.A.id}`, ctx.headers)
+        expect(data.stock[0].available).toBe(6)
+
+        expect((await api.get("/store/stock", ctx.headers).catch((e: any) => e.response)).status).toBe(400)
+        const many = Array.from({ length: 101 }, (_, i) => `variant_${i}`).join(",")
+        expect((await api.get(`/store/stock?variant_ids=${many}`, ctx.headers).catch((e: any) => e.response)).status).toBe(400)
+      })
+
+      it("giữ hàng qua API-14 thì phát số mới lên kênh cho gateway", async () => {
+        const ctx = await setup()
+        await ctx.setStock(ctx.A, 4)
+        const sub = new Redis(process.env.REDIS_URL || "redis://localhost:6379")
+        const messages: any[] = []
+        sub.on("message", (_channel, message) => messages.push(JSON.parse(message)))
+        await sub.subscribe(hotStock().channel)
+
+        const cartId = await ctx.newCart([{ variant_id: ctx.A.id, quantity: 3 }])
+        expect((await ctx.reserve(cartId)).status).toBe(200)
+        await waitFor(async () => (messages.length ? true : undefined), { timeoutMs: 5000 })
+        await sub.quit()
+        expect(messages).toContainEqual({ location_id: ctx.store.stockLocationId, inventory_item_id: ctx.refOf(ctx.A).inventory_item_id, available: 1 })
       })
     })
   },
