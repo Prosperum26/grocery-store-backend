@@ -19,7 +19,7 @@
 | HS-4 | Workflow và route giữ hàng (API-14) | HS-3 | [x] Xong · 7 test http |
 | HS-5 | Vòng đời hold: xác nhận khi có đơn, hết hạn | HS-4 | [x] Xong · 5 test http |
 | HS-6 | VNPAY: link 10 phút, nhả khi thất bại, lưới an toàn khi IPN tới muộn | HS-5 | [~] Code và test xong (IPN giả lập, API hoàn tiền giả lập bằng `jest.spyOn(fetch)`); chưa kiểm trên sandbox thật (D0) |
-| HS-7 | Thí nghiệm H4, đo P95, dàn ý `docs/hot-stock.md` | HS-6 | [ ] |
+| HS-7 | Thí nghiệm H4, đo P95, dàn ý `docs/hot-stock.md` | HS-6 | [x] Xong · số đo ở `docs/hot-stock-results.md` |
 | HS-8 | Pub/Sub → Socket.io gateway và `GET /store/stock` | HS-3 | [ ] |
 | HS-9 | (Tùy chọn) Module Redis của Medusa: event bus, workflow engine, locking | HS-7 | [ ] |
 | HS-10 | Tài liệu: README, `.env.template`, bảng API, nhật ký | tất cả | [ ] |
@@ -228,14 +228,14 @@ Rủi ro chưa xử lý được gom ở [`docs/known-risks.md`](../known-risks.
 
 ## Task HS-7: Thí nghiệm và tài liệu cho báo cáo
 
-**Files:** `integration-tests/http/hot-stock-h4.spec.ts`, `tools/bench/hot-stock-bench.ts`, `docs/hot-stock.md`.
+**Files:** `integration-tests/http/hot-stock-h4.spec.ts`, `src/scripts/bench-hot-stock.ts` (**khác plan:** script `medusa exec` thay cho `tools/bench/`, để dùng chung ioredis và service của module), `docs/hot-stock-results.md`, `docs/hot-stock.md`.
 
 **Xong khi:** có số đo thật kèm môi trường đo; `docs/hot-stock.md` có dàn ý và sơ đồ. **Phần văn xuôi do hai người làm issue #9 (noper1080, Thiện) tự viết lại** (yêu cầu AI score < 10%).
 
-- [ ] H4 qua HTTP: N = 100 lần gọi API-14 đồng thời, S0 = 5, lặp 20 lần; thêm các kịch bản thanh toán lỗi, gọi lặp, hết hạn hold. Ghi số thành công và `avail` nhỏ nhất.
-- [ ] Đo P95 của `reserve_hold` (gọi trực tiếp và qua HTTP), so với bản GET/DECRBY không nguyên tử của repo thử (số lần bán lố). Ghi máy, số lần lặp, cách tính P95. Đây là số đo được, không phải số mục tiêu của proposal.
-- [ ] Dàn ý `docs/hot-stock.md`: vấn đề, vì sao cần thao tác nguyên tử, các script, vòng đời hold, đồng bộ Postgres, luồng VNPAY (sơ đồ 2.3), các chỗ khác proposal (D5, D9), các tình huống lệch dữ liệu (tiêu chí của issue #9).
-- [ ] Commit `test(hot-stock): H4 concurrency experiment and latency benchmark`.
+- [x] H4 qua HTTP: 100 giỏ gọi API-14 cùng lúc, S0 = 5, 20 lượt → 20/20 lượt đúng 5 giỏ, 95 lần `409 OUT_OF_STOCK`, 0 lỗi khác, tồn thấp nhất 0. Vòng đầy đủ (3 trả tiền, 2 thanh toán lỗi, 2 giỏ khác giữ lại) → 5 đơn, `reserved` = 5. Các kịch bản thanh toán lỗi, gọi lặp, hết hạn đã có test ở HS-2, HS-5, HS-6.
+- [x] P95 (máy i7-13650HX, Redis trong Docker Desktop): Redis giữ hàng 0,75 ms gọi lần lượt, 6,8 ms khi 100 yêu cầu tranh nhau; HTTP API-14 15 ms gọi lần lượt, ~800 ms khi 100 request cùng lúc vào một tiến trình (xếp hàng). GET + DECRBY: 0/20 lượt đúng, bán lố 1.766 món, tồn −95.
+- [x] Dàn ý `docs/hot-stock.md` (ý chính, bảng, sơ đồ; văn xuôi để nhóm issue #9 tự viết).
+- [x] Commit `test(hot-stock): H4 concurrency experiment and latency benchmark`.
 
 ## Task HS-8: Pub/Sub → Socket.io
 
