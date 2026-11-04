@@ -17,7 +17,7 @@
 | HS-2 | Chuyển 3 script Lua vào module, sửa lỗi, test jest | HS-1 | [x] Xong · 29 test trên Redis thật (`npm run test:integration:modules`) |
 | HS-3 | Bản sao tồn kho trong Redis: dựng từ Postgres, đồng bộ, đối soát | HS-2 | [x] Xong · 7 test http, dựng 2.129 món trên DB dev |
 | HS-4 | Workflow và route giữ hàng (API-14) | HS-3 | [x] Xong · 7 test http |
-| HS-5 | Vòng đời hold: xác nhận khi có đơn, hết hạn | HS-4 | [ ] |
+| HS-5 | Vòng đời hold: xác nhận khi có đơn, hết hạn | HS-4 | [x] Xong · 5 test http |
 | HS-6 | VNPAY: link 10 phút, nhả khi thất bại, lưới an toàn khi IPN tới muộn | HS-5 | [ ] |
 | HS-7 | Thí nghiệm H4, đo P95, dàn ý `docs/hot-stock.md` | HS-6 | [ ] |
 | HS-8 | Pub/Sub → Socket.io gateway và `GET /store/stock` | HS-3 | [ ] |
@@ -203,14 +203,14 @@ Rủi ro chưa xử lý được gom ở [`docs/known-risks.md`](../known-risks.
 
 ## Task HS-5: Xác nhận và hết hạn
 
-**Files:** `src/subscribers/hot-stock-confirm.ts`, `src/jobs/expire-holds.ts`, test http.
+**Files:** `src/subscribers/hot-stock-confirm.ts`, `src/workflows/confirm-cart-hold.ts`, `src/jobs/expire-holds.ts`, `src/workflows/expire-holds.ts`, `integration-tests/http/hot-stock-lifecycle.spec.ts`.
 
 **Xong khi:** đặt đơn xong thì hold thành `CONFIRMED` và key khớp Postgres; hold quá 15 phút thì `EXPIRED` và hàng trả về; hủy đơn đã xác nhận thì key tăng lại qua HS-3 (không gọi `release`, vì hold đã `CONFIRMED`).
 
-- [ ] Subscriber `order.placed`: tra cart qua `order_cart` (sửa lỗi lấy order id làm cart id của repo thử) → `confirm` → đặt lại các item của đơn.
-- [ ] Job mỗi phút gọi `expireDue` (tối đa 200 hold một lần, như repo thử).
-- [ ] Test: hoàn tất giỏ đã giữ rồi kiểm key; giả lập hết hạn (gọi `expireDue` với `now` tương lai).
-- [ ] Commit `feat(hot-stock): confirm holds on order placed, expire stale holds`.
+- [x] Subscriber `order.placed` → workflow `confirm-cart-hold`: đọc `order.cart.id` (sửa lỗi lấy order id làm cart id của repo thử) → `confirm` → đặt lại các món của đơn bằng `syncHotStockWorkflow.runAsStep`. Đơn không có hold (khách bỏ qua API-14) thì ghi log `not_held`, số vẫn đúng vì đồng bộ theo Postgres.
+- [x] Job mỗi phút (`* * * * *`) chạy workflow `expire-hot-stock-holds` gọi `expireDue` (tối đa 200 hold một lần). Hold không có TTL trong Redis nên hạn thực tế là 15–16 phút.
+- [x] Test: giữ rồi đặt đơn (CONFIRMED, `held` 0, avail không bị trừ hai lần, Postgres `reserved` = 3); huỷ đơn đã xác nhận (hàng về qua reservation bị xoá, hold vẫn CONFIRMED); đặt đơn không giữ trước; hết hạn với `now` +890 giây (chưa trả) và +901 giây (trả, giữ lại được); job theo giờ thật không đụng hold mới và hold đã xác nhận.
+- [x] Commit `feat(hot-stock): confirm holds on order placed, expire stale holds`.
 
 ## Task HS-6: VNPAY
 
