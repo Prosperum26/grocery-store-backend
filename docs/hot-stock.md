@@ -130,7 +130,7 @@ sequenceDiagram
 ## 8. Kết quả và hạn chế
 
 - Bảng H4 và độ trễ: chép số từ `hot-stock-results.md`, ghi rõ máy và điều kiện đo.
-- Hạn chế để nêu thật: VNPAY chỉ giả lập (R4, R5); một tiến trình Node nên 100 request cùng lúc phải xếp hàng (p95 ~800 ms); badge tồn trên storefront chưa trừ phần đang giữ (R6, HS-8); Redis đơn, chưa cluster.
+- Hạn chế để nêu thật: VNPAY chỉ giả lập (R4, R5); một tiến trình Node nên 100 request cùng lúc phải xếp hàng (p95 ~800 ms); trang sản phẩm và giỏ đã dùng số trừ phần đang giữ và cập nhật trực tiếp, nhưng danh sách sản phẩm và bộ lọc "còn hàng" vẫn theo chỉ mục tìm kiếm của Postgres (R6); Redis đơn, chưa cluster.
 
 ## 9. Khác proposal (tổng hợp)
 

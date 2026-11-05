@@ -176,7 +176,7 @@ npm run gateway:dev                                   # http://localhost:4001, r
 npm test --workspace=@dtc/realtime-gateway            # needs the Redis container
 ```
 
-The storefront first calls `GET /store/stock?variant_ids=...` (API-15) for the current numbers and the `inventory_item_id` of each variant, then emits `subscribe { inventory_item_ids }` and listens to `stock:update`. The gateway runs TypeScript directly with `node --experimental-strip-types` (Node 22.12+), so it has no build step. Contract: API-15 and API-16 in the plan's API table.
+The storefront first calls `GET /store/stock?variant_ids=...&cart_id=...` (API-15) for the current numbers (net of other customers' holds, with this cart's own hold added back as `held_by_cart`) and the `inventory_item_id` of each variant, then emits `subscribe { inventory_item_ids }` and listens to `stock:update`. The gateway runs TypeScript directly with `node --experimental-strip-types` (Node 22.12+), so it has no build step. Contract: API-15 and API-16 in the plan's API table.
 
 ## VNPAY (sandbox)
 
