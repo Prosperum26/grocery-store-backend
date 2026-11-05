@@ -182,11 +182,27 @@ medusaIntegrationTestRunner({
         const { data } = await api.get(`/store/stock?variant_ids=${ctx.A.id},${ctx.B.id},variant_khong_co,${ctx.A.id}`, ctx.headers)
         expect(data.stock).toEqual(
           expect.arrayContaining([
-            { variant_id: ctx.A.id, inventory_item_id: ctx.refOf(ctx.A).inventory_item_id, location_id: ctx.store.stockLocationId, available: 3 },
-            { variant_id: ctx.B.id, inventory_item_id: ctx.refOf(ctx.B).inventory_item_id, location_id: ctx.store.stockLocationId, available: 8 },
+            { variant_id: ctx.A.id, inventory_item_id: ctx.refOf(ctx.A).inventory_item_id, location_id: ctx.store.stockLocationId, available: 3, held_by_cart: 0 },
+            { variant_id: ctx.B.id, inventory_item_id: ctx.refOf(ctx.B).inventory_item_id, location_id: ctx.store.stockLocationId, available: 8, held_by_cart: 0 },
           ])
         )
         expect(data.stock).toHaveLength(2)
+      })
+
+      it("RB-2: có cart_id thì cộng lại phần chính giỏ đó đang giữ; hold hết hạn thì thôi", async () => {
+        const ctx = await setup()
+        await ctx.setStock(ctx.A, 5)
+        const mine = await ctx.newCart([{ variant_id: ctx.A.id, quantity: 2 }])
+        await ctx.reserve(mine)
+
+        const anyone = (await api.get(`/store/stock?variant_ids=${ctx.A.id}`, ctx.headers)).data.stock[0]
+        expect([anyone.available, anyone.held_by_cart]).toEqual([3, 0])
+        const own = (await api.get(`/store/stock?variant_ids=${ctx.A.id}&cart_id=${mine}`, ctx.headers)).data.stock[0]
+        expect([own.available, own.held_by_cart]).toEqual([5, 2])
+
+        await hotStock().expireDue({ now: Math.floor(Date.now() / 1000) + 901 })
+        const expired = (await api.get(`/store/stock?variant_ids=${ctx.A.id}&cart_id=${mine}`, ctx.headers)).data.stock[0]
+        expect([expired.available, expired.held_by_cart]).toEqual([5, 0])
       })
 
       it("Redis trống: tự đặt lại từ Postgres; thiếu tham số hoặc quá 100 id thì 400", async () => {

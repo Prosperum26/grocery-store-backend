@@ -9,6 +9,7 @@ describe("variantStock", () => {
       inventory_item_id: "i1",
       location_id: "loc",
       available: 7,
+      held_by_cart: 0,
     })
   })
 
@@ -27,6 +28,13 @@ describe("variantStock", () => {
       inventory_item_id: null,
       location_id: null,
       available: null,
+      held_by_cart: 0,
     })
+  })
+
+  it("cộng lại phần giỏ người gọi đang giữ; held_by_cart theo đơn vị biến thể", () => {
+    const held = (values: Record<string, number>) => (itemId: string) => values[itemId] ?? 0
+    expect(variantStock({ id: "v1", inventory_items: [{ inventory_item_id: "i1" }] }, "loc", avail({ i1: 3 }), held({ i1: 2 }))).toMatchObject({ available: 5, held_by_cart: 2 })
+    expect(variantStock({ id: "loc6", inventory_items: [{ inventory_item_id: "lon", required_quantity: 6 }] }, "loc", avail({ lon: 4 }), held({ lon: 12 }))).toMatchObject({ available: 2, held_by_cart: 2 })
   })
 })
