@@ -86,8 +86,15 @@ medusaIntegrationTestRunner({
       const cartMeta = async (cartId: string) => ((await graph({ entity: "cart", fields: ["metadata", "completed_at"], filters: { id: cartId } }))[0]) as any
       const holdStatus = async (cartId: string) => (await hotStock().getHold(cartId))?.status ?? null
       const expireAll = () => hotStock().expireDue({ now: Math.floor(Date.now() / 1000) + 901 })
+      // Khách thanh toán lại trên cùng giỏ: phiên VNPAY mới (txn_ref mới), phiên cũ bị Medusa xoá.
+      const retry = async (cartId: string) => {
+        const { data } = await api.get(`/store/carts/${cartId}?fields=+payment_collection.id`, headers)
+        const { data: s } = await api.post(`/store/payment-collections/${data.cart.payment_collection.id}/payment-sessions`, { provider_id: "pp_vnpay_vnpay" }, headers)
+        const session = s.payment_collection.payment_sessions[0]
+        return { cartId, sessionId: session.id as string, txnRef: session.data.txn_ref as string, amountVnd: Number(session.amount) }
+      }
       const setStock = (n: number) => updateInventoryLevelsWorkflow(container).run({ input: { updates: [{ ...ref, stocked_quantity: n }] } })
-      return { container, headers, avail, waitForAvail, checkout, reserve, ipn, orderOf, waitForOrder, cartMeta, holdStatus, expireAll, setStock }
+      return { container, headers, avail, waitForAvail, checkout, reserve, ipn, orderOf, waitForOrder, cartMeta, holdStatus, expireAll, setStock, retry }
     }
 
     describe("IPN và hold", () => {
@@ -148,6 +155,39 @@ medusaIntegrationTestRunner({
         expect(completed.data.type).not.toBe("order")
         expect((await ctx.ipn(a)).data.RspCode).toBe("02")
         expect(refundCalls()).toBe(1)
+        expect(await ctx.orderOf(a.cartId)).toBeUndefined()
+      })
+
+      it("RB-1: bị hoàn tiền rồi thanh toán lại trên cùng giỏ khi đã có hàng: có đơn, không bị coi là IPN lặp", async () => {
+        const ctx = await setup(1)
+        const a = await ctx.checkout(1)
+        const b = await ctx.checkout(1)
+        await ctx.reserve(b.cartId)
+        expect((await ctx.ipn(a)).data.RspCode).toBe("00")
+        expect((await ctx.cartMeta(a.cartId)).metadata.stock_failed).toMatchObject({ refund: "refunded", txn_ref: a.txnRef })
+
+        // B thanh toán lỗi, hàng về kho; A thử lại với phiên mới.
+        await ctx.ipn(b, "24")
+        const a2 = await ctx.retry(a.cartId)
+        expect(a2.txnRef).not.toBe(a.txnRef)
+        expect((await ctx.reserve(a.cartId)).status).toBe(200)
+        expect((await ctx.ipn(a2)).data.RspCode).toBe("00")
+        await ctx.waitForOrder(a.cartId)
+        expect(refundCalls()).toBe(1)
+      })
+
+      it("RB-1: thanh toán lại khi vẫn hết hàng: hoàn lần hai, stock_failed ghi giao dịch mới; IPN lặp của giao dịch mới trả 02", async () => {
+        const ctx = await setup(1)
+        const a = await ctx.checkout(1)
+        const b = await ctx.checkout(1)
+        await ctx.reserve(b.cartId)
+        await ctx.ipn(a)
+        const a2 = await ctx.retry(a.cartId)
+        expect((await ctx.ipn(a2)).data.RspCode).toBe("00")
+        expect(refundCalls()).toBe(2)
+        expect((await ctx.cartMeta(a.cartId)).metadata.stock_failed).toMatchObject({ refund: "refunded", txn_ref: a2.txnRef })
+        expect((await ctx.ipn(a2)).data.RspCode).toBe("02")
+        expect(refundCalls()).toBe(2)
         expect(await ctx.orderOf(a.cartId)).toBeUndefined()
       })
 

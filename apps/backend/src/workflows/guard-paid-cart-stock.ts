@@ -11,6 +11,8 @@ import { reserveCartStockWorkflow, type ReserveCartStockResult, type StockShorta
 /** Ghi vào `cart.metadata.stock_failed` khi khách đã trả tiền nhưng hết hàng (plan hot-stock D4). */
 export type StockFailed = {
   at: string
+  /** vnp_TxnRef của giao dịch đã hoàn: IPN lặp của đúng giao dịch này trả 02, giao dịch mới thì xử lý lại (RB-1). */
+  txn_ref: string
   items: StockShortage[]
   vnp_transaction_no?: string
   /** refunded: VNPAY đã nhận lệnh hoàn · failed: hoàn lỗi, Admin xử lý tay (rủi ro R4). */
@@ -20,18 +22,24 @@ export type StockFailed = {
 
 export type GuardPaidCartInput = {
   cart_id: string
+  /** vnp_TxnRef của IPN đang xử lý. */
+  txn_ref: string
   session: { amount: unknown; data: Record<string, unknown> }
   vnp_transaction_no?: string
 }
 
-/** hold_ok: hold còn HELD · reheld: hold đã hết, giữ lại được · already_failed: IPN gửi lại sau khi đã hoàn · out_of_stock: đã hoàn tiền */
+/** hold_ok: hold còn HELD · reheld: hold đã hết, giữ lại được · already_failed: IPN gửi lại của giao dịch đã hoàn · out_of_stock: đã hoàn tiền */
 export type GuardPaidCartResult = { status: "hold_ok" | "reheld" | "already_failed" } | { status: "out_of_stock"; stock_failed: StockFailed }
 
 type CartForGuard = { id: string; metadata: Record<string, unknown> | null }
 
-// Hold còn HELD (hoặc đã CONFIRMED) thì đi tiếp; IPN lặp lại sau khi đã hoàn tiền thì dừng.
-const checkPaidCartHoldStep = createStep("check-paid-cart-hold", async (cart: CartForGuard, { container }) => {
-  if (cart.metadata?.stock_failed) {
+// Hold còn HELD (hoặc đã CONFIRMED) thì đi tiếp; IPN lặp lại của đúng giao dịch đã hoàn thì dừng.
+// Chỉ so theo giao dịch, không theo giỏ: khách bị hoàn rồi thanh toán lại trên cùng giỏ (phiên VNPAY mới,
+// txn_ref mới) phải được xử lý như bình thường, nếu không tiền lần hai bị thu mà không có đơn (RB-1).
+const checkPaidCartHoldStep = createStep("check-paid-cart-hold", async (input: { cart: CartForGuard; txn_ref: string }, { container }) => {
+  const { cart } = input
+  const failed = cart.metadata?.stock_failed as Partial<StockFailed> | undefined
+  if (failed?.txn_ref === input.txn_ref) {
     return new StepResponse("already_failed" as const)
   }
   const hold = await container.resolve<HotStockModuleService>(HOT_STOCK_MODULE).getHold(cart.id)
@@ -45,8 +53,9 @@ const checkPaidCartHoldStep = createStep("check-paid-cart-hold", async (cart: Ca
  */
 const refundOutOfStockStep = createStep(
   "refund-out-of-stock-payment",
-  async (input: { cart: CartForGuard; session: GuardPaidCartInput["session"]; items: StockShortage[]; vnp_transaction_no?: string }, { container }) => {
-    const stockFailed: StockFailed = { at: new Date().toISOString(), items: input.items, vnp_transaction_no: input.vnp_transaction_no, refund: "failed" }
+  async (input: { cart: CartForGuard; session: GuardPaidCartInput["session"]; items: StockShortage[]; txn_ref: string; vnp_transaction_no?: string }, { container }) => {
+    // Ghi đè stock_failed của lần trước (nếu có): giỏ chỉ giữ kết quả của lần thanh toán gần nhất.
+    const stockFailed: StockFailed = { at: new Date().toISOString(), txn_ref: input.txn_ref, items: input.items, vnp_transaction_no: input.vnp_transaction_no, refund: "failed" }
     try {
       const original = readOriginalPayment(input.session.data)
       const result = await requestVnpayRefund(vnpayOptionsFromEnv(), {
@@ -94,7 +103,7 @@ export const guardPaidCartStockWorkflow = createWorkflow("guard-paid-cart-stock"
     options: { throwIfKeyNotFound: true },
   })
   const cart = transform({ carts }, ({ carts }) => carts[0] as CartForGuard)
-  const check = checkPaidCartHoldStep(cart)
+  const check = checkPaidCartHoldStep(transform({ cart, input }, ({ cart, input }) => ({ cart, txn_ref: input.txn_ref })))
 
   const rehold = when({ check }, ({ check }) => check === "needs_rehold").then(() =>
     reserveCartStockWorkflow.runAsStep({ input: { cart_id: input.cart_id } })
@@ -106,6 +115,7 @@ export const guardPaidCartStockWorkflow = createWorkflow("guard-paid-cart-stock"
         cart,
         session: input.session,
         items: (rehold as Extract<ReserveCartStockResult, { status: "out_of_stock" }>).items,
+        txn_ref: input.txn_ref,
         vnp_transaction_no: input.vnp_transaction_no,
       }))
     )

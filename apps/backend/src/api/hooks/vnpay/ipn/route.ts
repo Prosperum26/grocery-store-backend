@@ -98,7 +98,12 @@ async function handleIpn(req: MedusaRequest) {
   //     (phiên không có dấu paid nên giỏ cũng không hoàn tất được bằng `complete`).
   if (cartId && session.data?.paid !== true) {
     const { result: guard } = await guardPaidCartStockWorkflow(req.scope).run({
-      input: { cart_id: cartId, session: { amount: session.amount, data: session.data ?? {} }, vnp_transaction_no: query.vnp_TransactionNo },
+      input: {
+        cart_id: cartId,
+        txn_ref: query.vnp_TxnRef,
+        session: { amount: session.amount, data: session.data ?? {} },
+        vnp_transaction_no: query.vnp_TransactionNo,
+      },
     })
     if (guard.status === "already_failed") {
       return RESPONSES.alreadyConfirmed
