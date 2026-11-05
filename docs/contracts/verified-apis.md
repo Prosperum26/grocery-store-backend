@@ -352,3 +352,9 @@ Chỉ chạy với VNPAY giả lập (D0): IPN ký bằng khóa thử, API hoàn
 - **Khoá theo giỏ** (`acquireLockStep`, khoá in-memory) đủ để hai IPN cùng lúc cho giỏ hết hàng chỉ hoàn một lần: lần sau thấy `stock_failed` và trả `02`.
 - **Hoàn tất giỏ thiếu hàng sau khi thu tiền** (tái hiện R2 bằng cách giảm tồn Postgres dưới số đang giữ): Medusa gọi `refundPayment` của provider; VNPAY từ chối thì payment vẫn captured, không có refund, không có đơn. `query.graph` lọc được `captured_at: { $ne: null }`.
 - **Chưa kiểm:** chữ ký và mã trả lời thật của API hoàn tiền (chung với BE-8, R4).
+
+## HS-6b, HS-8b — Sửa sau khi rà lại (2026-11-05)
+
+- **Tạo phiên VNPAY mới cho cùng payment collection** (`POST /store/payment-collections/:id/payment-sessions` lần hai) trả phiên mới với `txn_ref` mới; test dùng cách này để giả lập khách thanh toán lại trên cùng giỏ sau khi bị hoàn tiền.
+- **Lỗi đã sửa:** trước HS-6b, guard coi mọi IPN của giỏ đã có `stock_failed` là IPN lặp (trả `02`), nên lần thanh toán lại bị thu tiền mà không có đơn. Bỏ bản sửa thì 2 test HS-6b lỗi (`02` thay vì `00`, không có đơn), có bản sửa thì qua.
+- **API-15 với `cart_id`:** chỉ cộng hold đang `HELD` của giỏ (đọc `getHold`); hold đã hết hạn thì `held_by_cart = 0`.

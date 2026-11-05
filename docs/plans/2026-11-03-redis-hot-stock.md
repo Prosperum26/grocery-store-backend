@@ -23,6 +23,8 @@
 | HS-8 | Pub/Sub → Socket.io gateway và `GET /store/stock` | HS-3 | [x] Xong · gateway `apps/realtime-gateway`, API-15, API-16 |
 | HS-9 | (Tùy chọn) Module Redis của Medusa: event bus, workflow engine, locking | HS-7 | Hoãn (2026-11-04): backend chạy một tiến trình, chưa cần; xem task HS-9 và R7 |
 | HS-10 | Tài liệu: README, `.env.template`, bảng API, nhật ký | tất cả | [x] Xong · cập nhật theo từng task; nhật ký ngoài repo 2026-11-04 |
+| HS-6b | Sửa: `stock_failed` theo từng giao dịch (`txn_ref`), thanh toán lại sau khi bị hoàn tiền không bị nuốt (= RB-1 của plan storefront `2026-11-05-redis-vs-postgres.md`) | HS-6 | [x] Xong · 2 test http |
+| HS-8b | API-15 nhận `cart_id`, trả `held_by_cart` (= RB-2 của plan storefront `2026-11-05-redis-vs-postgres.md`) | HS-8 | [x] Xong · 1 test http, 1 unit |
 
 Ký hiệu như plan `2026-10-18`: `[x]` xong và đã kiểm · `[~]` code và test xong nhưng còn phần kiểm tay · `[ ]` chưa làm.
 
