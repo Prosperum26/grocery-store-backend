@@ -5,6 +5,7 @@ import { loadCatalogV2 } from "../lib/seed/seed-data/load-catalog-v2"
 import { seedDemo } from "../lib/seed/seed-demo"
 import { DEMO_DATA } from "../lib/seed/seed-data/demo"
 import { seedPromotions } from "../lib/seed/seed-promotions"
+import { syncHotStockWorkflow } from "../workflows/sync-hot-stock"
 
 // Chạy: npm run seed --workspace=@dtc/backend. Idempotent, chạy lại an toàn.
 export default async function seed({ container }: ExecArgs) {
@@ -26,8 +27,12 @@ export default async function seed({ container }: ExecArgs) {
   const password = process.env.DEMO_PASSWORD
   if (!password) {
     console.warn("Bỏ qua khách/admin/đơn demo: chưa đặt DEMO_PASSWORD trong apps/backend/.env")
-    return
+  } else {
+    const demo = await seedDemo(container, store, DEMO_DATA, password)
+    console.log(`Demo: admin ${demo.admin ? "created" : "exists"}, ${demo.customers} customers, created ${demo.orders} orders`)
   }
-  const demo = await seedDemo(container, store, DEMO_DATA, password)
-  console.log(`Demo: admin ${demo.admin ? "created" : "exists"}, ${demo.customers} customers, created ${demo.orders} orders`)
+
+  // Cuối cùng (sau đơn demo có reservation): đẩy tồn kho sang Redis cho cổng giữ hàng (hot-stock HS-3).
+  const { result } = await syncHotStockWorkflow(container).run({ input: {} })
+  console.log(`Hot-stock: ${result.synced} items synced to Redis`)
 }

@@ -1,0 +1,23 @@
+{
+  "name": "@dtc/realtime-gateway",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Socket.io gateway: forwards hot-stock changes from Redis Pub/Sub to the storefront",
+  "type": "module",
+  "engines": {
+    "node": "^22.12.0 || >=24"
+  },
+  "scripts": {
+    "dev": "node --experimental-strip-types --env-file-if-exists=.env --watch src/index.ts",
+    "start": "node --experimental-strip-types --env-file-if-exists=.env src/index.ts",
+    "test": "node --experimental-strip-types --test src/rooms.test.ts src/gateway.test.ts",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "devDependencies": {
+    "socket.io-client": "4.8.1"
+  },
+  "dependencies": {
+    "ioredis": "5.11.1",
+    "socket.io": "4.8.1"
+  }
+}

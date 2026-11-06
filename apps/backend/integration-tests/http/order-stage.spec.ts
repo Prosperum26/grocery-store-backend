@@ -220,6 +220,8 @@ medusaIntegrationTestRunner({
         // Đơn đã có stage từ event: backfill không được sửa.
         const staged = await placeOrder()
         await waitForStage(staged, "PENDING")
+        // order.placed còn subscriber gán mã đơn: chờ cả `code` rồi mới chụp, không thì bản chụp thiếu trường đó.
+        await waitFor(async () => ((await orderMetadata(staged)).code ? true : undefined), { timeoutMs: WAIT_MS })
         const stagedBefore = await orderMetadata(staged)
 
         // Đơn cũ chưa có stage: một đơn chờ xử lý, một đơn đã huỷ (huỷ từ trạng thái chưa có stage
