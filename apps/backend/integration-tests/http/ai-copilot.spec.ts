@@ -62,6 +62,12 @@ medusaIntegrationTestRunner({
           if (behaviour === "all-down" || (behaviour === "copilot-down" && req.url === "/api/v1/copilot")) {
             return send(503, { detail: "down" })
           }
+          if (req.url === "/api/v1/recipe" || req.url === "/api/v1/ask") {
+            if (raw.includes("khong-co")) return send(404, { detail: "unknown" })
+            if (req.url === "/api/v1/ask") return send(200, { answer: "Khoảng 300 kcal (ước tính).", status: "ok", provider: "p", model: "m", latency_ms: 5 })
+            const [first] = searchData().results as any[]
+            return send(200, { recipe: first.recipe, servings: 4, complete: true, prep_steps: ["Sơ chế"], cooking_steps: ["Nấu"], basket: first.basket, not_in_basket: ["lá giang"] })
+          }
           const data = searchData(behaviour === "empty" ? [] : undefined)
           send(200, req.url === "/api/v1/copilot" ? { data, ai: COPILOT_AI, ai_status: "ok", latency_ms: 5 } : data)
         })
@@ -134,6 +140,36 @@ medusaIntegrationTestRunner({
           const res = await post(url, { query: "canh chua" })
           expect({ url, status: res.status, code: res.data.code }).toEqual({ url, status: 503, code: "AI_UNAVAILABLE" })
         }
+      })
+
+      it("/store/ai/recipe trả các bước và giỏ đã gắn biến thể; món lạ là 404", async () => {
+        const { post } = await setup()
+        const res = await post("/store/ai/recipe", { recipe_id: "canh-chua", servings: 4 })
+        expect(res.status).toBe(200)
+        expect(res.data).toMatchObject({ cooking_steps: ["Nấu"], prep_steps: ["Sơ chế"], not_in_basket: ["lá giang"] })
+        expect(res.data.basket.buy[0].variant).toMatchObject({ purchasable: true })
+        expect(res.data.basket.buy[0].alternatives[0].variant).toMatchObject({ purchasable: false })
+        expect(res.data.basket.maybe_have[0].variant).toBeNull()
+        expect(seen[0]).toMatchObject({ url: "/api/v1/recipe", key: "test-internal-key", body: { recipe_id: "canh-chua", servings: 4 } })
+
+        const missing = await post("/store/ai/recipe", { recipe_id: "khong-co" })
+        expect({ status: missing.status, code: missing.data.code }).toEqual({ status: 404, code: "AI_RECIPE_NOT_FOUND" })
+      })
+
+      it("/store/ai/ask chuyển câu hỏi và trả câu trả lời; sập là 503; body sai là 400", async () => {
+        const { post } = await setup()
+        const res = await post("/store/ai/ask", { recipe_id: "canh-chua", question: "calo?" })
+        expect(res.status).toBe(200)
+        expect(res.data).toMatchObject({ answer: expect.stringContaining("kcal"), status: "ok" })
+        expect(seen[0].body).toEqual({ recipe_id: "canh-chua", question: "calo?" })
+
+        expect((await post("/store/ai/ask", { recipe_id: "khong-co", question: "q" })).status).toBe(404)
+        expect((await post("/store/ai/ask", { recipe_id: "canh-chua", question: "  " })).status).toBe(400)
+        expect((await post("/store/ai/recipe", { recipe_id: "" })).status).toBe(400)
+
+        behaviour = "all-down"
+        const down = await post("/store/ai/ask", { recipe_id: "canh-chua", question: "calo?" })
+        expect({ status: down.status, code: down.data.code }).toEqual({ status: 503, code: "AI_UNAVAILABLE" })
       })
 
       it("không có món nào (accepted: false) vẫn trả 200 với danh sách rỗng", async () => {

@@ -11,6 +11,12 @@
 | `POST /store/ai/search` | Tìm món theo câu hỏi, trả giỏ nguyên liệu dựng sẵn. Nhanh (không dùng mô hình ngôn ngữ) | Đã nối AI service `/api/v1/search`, gắn `variant` (workflow `ai-recipe-search`) |
 | `POST /store/ai/copilot` | Như trên, kèm lời AI: giải thích, gợi ý lượng mua, hướng dẫn món phụ. Chậm hơn (vài giây) | Đã nối `/api/v1/copilot`; lỗi hay quá giờ thì dùng `/search`, `ai: null`, `ai_status: "fallback_error"` |
 
+| `POST /store/ai/recipe` | Màn công thức của một món: các bước chuẩn bị và nấu, giỏ nguyên liệu theo số người, dòng công thức cửa hàng không bán. Không dùng mô hình ngôn ngữ nên nhanh; storefront gọi lại khi khách đổi số người | Nối `/api/v1/recipe`, gắn `variant` (workflow `ai-recipe-detail`) |
+| `POST /store/ai/ask` | Khách bấm "hỏi thêm" về món đang xem (dinh dưỡng, bớt gì cho hợp khẩu vị...). Chỉ gọi khi khách bấm nút. Chậm (vài giây) | Nối `/api/v1/ask` (workflow `ai-recipe-ask`) |
+
+- `recipe`: body `{ recipe_id, servings? (1–50), have? }` (`id` lấy từ `data.results[].recipe.id`), trả `StoreAiRecipeResponse` = `{ recipe, servings, complete, prep_steps[], cooking_steps[], basket (có variant), not_in_basket[] }`. Không có món: `404 { code: "AI_RECIPE_NOT_FOUND" }`.
+- `ask`: body `{ recipe_id, question (1–300), servings? }`, trả `{ answer, status, provider, model, latency_ms }`. Mô hình tắt, lỗi hay quá giờ thì vẫn `200` với `answer: null` và `status` là `fallback_*` (storefront hiện "Chưa trả lời được, bạn thử lại"). Không có món: `404`. Câu trả lời là văn bản thường, số dinh dưỡng chỉ là ước tính.
+
 - Cần `x-publishable-api-key` như mọi route `/store`. **Không bắt đăng nhập**: khách vãng lai cũng dùng được.
 - Storefront có thể gọi `search` để hiện món ngay, rồi gọi `copilot` để bổ sung lời giải thích (plan AI, quyết định 3).
 
@@ -90,4 +96,5 @@ Sai ràng buộc: `400` (kiểm ở `middlewares.ts`, test `integration-tests/ht
 | Mã | Khi nào |
 | :--- | :--- |
 | `400` | Body sai ràng buộc, thiếu publishable key |
+| `404 { code: "AI_RECIPE_NOT_FOUND" }` | `recipe` / `ask` với `recipe_id` không có |
 | `503 { code: "AI_UNAVAILABLE" }` | AI service không trả lời được và không có bản dự phòng. Storefront hiện "Trợ lý Bếp tạm nghỉ" **[cần nhóm AI xác nhận]** |

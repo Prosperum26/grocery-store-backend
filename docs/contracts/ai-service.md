@@ -82,6 +82,8 @@ Theo plan AI mục 3, giữ nguyên:
 
 Backend (`/store/ai/search`, `/store/ai/copilot`) chuyển tiếp body, rồi **gắn phần bán hàng** vào từng `product` và `alternatives[]` theo hợp đồng storefront ([`ai-copilot.md`](ai-copilot.md)): `variant_id`, giá đang tính, tồn đã trừ phần khách khác đang giữ (như API-15), `purchasable`.
 
+**Màn công thức:** `POST /api/v1/recipe` (`{ recipe_id, servings?, have? }` → `recipe`, `servings`, `complete`, `prep_steps`, `cooking_steps`, `basket`, `not_in_basket`; 404 nếu không có món) và `POST /api/v1/ask` (`{ recipe_id, question (1–300), servings? }` → `{ answer | null, status, provider, model, latency_ms }`; mô hình lỗi vẫn 200 với `answer: null`; 404 nếu không có món). Backend gắn `variant` vào `basket` của `/recipe` và chuyển nguyên `/ask`. Mọi route `/api/v1/*` (trừ `/health`) cần header `X-Internal-Key`. Quá giờ mặc định: `AI_RECIPE_TIMEOUT_MS` 3000, `AI_ASK_TIMEOUT_MS` 35000.
+
 **Dự phòng:** `/store/ai/copilot` quá giờ hoặc lỗi → gọi `/api/v1/search` và trả `{ data, ai: null, ai_status: "fallback_error" }` nếu kịp; cả hai lỗi → `503 { code: "AI_UNAVAILABLE" }` để storefront hiện "Trợ lý Bếp tạm nghỉ, bạn thử lại sau". **[cần nhóm AI xác nhận]**
 
 Admin (`/admin/ai-settings`, `/admin/ai-stats` của AI service) chỉ được gọi qua route admin của backend (đã xác thực admin Medusa), theo plan AI.
