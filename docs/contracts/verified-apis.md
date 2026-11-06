@@ -290,7 +290,7 @@ Tài liệu ghi sai độ dài một số cột (`vnp_ResponseCode` "[14]", `vnp
 - `recipes_v2.json` của nhóm AI có hai nguyên liệu cùng trỏ về một sản phẩm (`rau om`, `ngò gai` → CAT-001087) và `raw_text` gộp nhiều nguyên liệu; hợp đồng quy định mỗi biến thể chỉ một dòng.
 - Route giữ chỗ kiểm body bằng zod rồi trả `501 { code: "IN_DEVELOPMENT" }`; `role: "system"` trong `history` bị từ chối.
 
-**Bằng chứng:** `docs/contracts/assistant-recipes.md`, `integration-tests/http/assistant.spec.ts`.
+**Bằng chứng:** `docs/contracts/assistant-recipes.md`, `integration-tests/http/assistant.spec.ts` (hai file này đã được thay ở AI-0, xem mục dưới).
 
 ## BE-11 — Admin
 
@@ -358,3 +358,10 @@ Chỉ chạy với VNPAY giả lập (D0): IPN ký bằng khóa thử, API hoàn
 - **Tạo phiên VNPAY mới cho cùng payment collection** (`POST /store/payment-collections/:id/payment-sessions` lần hai) trả phiên mới với `txn_ref` mới; test dùng cách này để giả lập khách thanh toán lại trên cùng giỏ sau khi bị hoàn tiền.
 - **Lỗi đã sửa:** trước HS-6b, guard coi mọi IPN của giỏ đã có `stock_failed` là IPN lặp (trả `02`), nên lần thanh toán lại bị thu tiền mà không có đơn. Bỏ bản sửa thì 2 test HS-6b lỗi (`02` thay vì `00`, không có đơn), có bản sửa thì qua.
 - **API-15 với `cart_id`:** chỉ cộng hold đang `HELD` của giỏ (đọc `getHold`); hold đã hết hạn thì `held_by_cart = 0`.
+
+## AI-0 — Hợp đồng 2 AI (2026-11-06)
+
+- **Hợp đồng BE-10 được thay** bằng hợp đồng của nhóm AI: `/store/ai/search`, `/store/ai/copilot` (API-8), kiểu `src/types/ai.ts`, tài liệu `docs/contracts/ai-copilot.md` và `ai-service.md`. Route cũ trả 404 (test `ai-copilot.spec.ts`).
+- **Catalog hai bên khớp:** `data/recipe_rag/final/catalog_v2.json` (repo AI, nhánh `feature/recipe-rag-copilot`) và `seed-data/catalog-v2.json` cùng 2.129 `catalog_id`; 3 món `draft` không công thức nào dùng. `src/ml/category_map.json` (nhánh `feature/predictive-reorder`) có đúng 11 handle danh mục cha.
+- **Trùng cổng:** `ai_db` của nhóm AI mặc định mở 5434, trùng `com4fud-postgres`; chốt `AI_DB_PORT=5435`. AI service chạy 8100 (`uvicorn` mặc định 8000 trùng storefront).
+- **Tiền tố:** `/api/v1/predict` đã chạy dưới `api_router` (`/api/v1`); plan Trợ lý Bếp ghi `/v1/search`, đề xuất thống nhất `/api/v1/*` (chờ nhóm AI xác nhận).

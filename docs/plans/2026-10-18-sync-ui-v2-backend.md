@@ -22,10 +22,10 @@
 | BE-7 | Bắt đầu giao: workflow + widget Admin + ước giờ tới | P1 | BE-6 | [x] Xong · `a86c183`, `f676dbc`; widget có ô tên tài xế và biển số, `metadata.delivery` đủ 6 trường API-7; đã kiểm trong Admin 28/10 (đơn #6). FE còn phải đọc `metadata.delivery.driver_name`/`plate` thay cho tài xế mẫu |
 | BE-8 | Khách tự hủy đơn khi còn "Chờ xác nhận" | P2 | BE-6 | [~] Một phần · `c509fb0`; chưa gọi API hoàn tiền sandbox VNPAY thật, chưa xử lý mã `94`/lỗi mạng khi hoàn |
 | BE-9 | Stub `reorder-basket` và `warm` | P2 | BE-2 | [x] Xong · `51a300d`; xếp theo tần suất trong đơn DELIVERED, bản tạm cho module Predictive |
-| BE-10 | Hợp đồng Trợ lý Bếp / Công thức (chỉ kiểu dữ liệu + fixture) | P2 | | [x] Xong · `41df2eb`; `src/types/assistant.ts`, `docs/contracts/assistant-recipes.md`, ví dụ từ dữ liệu thật; hai route kiểm body rồi trả 501 cho tới khi nối AI service |
+| BE-10 | Hợp đồng Trợ lý Bếp / Công thức (chỉ kiểu dữ liệu + fixture) | P2 | | [x] Xong · `41df2eb`; `src/types/assistant.ts`, `docs/contracts/assistant-recipes.md`, ví dụ từ dữ liệu thật; hai route kiểm body rồi trả 501 cho tới khi nối AI service. **Đã thay bằng hợp đồng AI-0** (2026-11-06) |
 | BE-11 | Admin: Việt hóa, widget Tổng quan, widget Sắp cạn kho | P3 | BE-2 | [x] Xong · `4b11660`, `4848531`; widget Tổng quan (Đơn hàng), Sắp cạn kho (Tồn kho), API-9, dịch nhóm nút tùy chỉnh bố cục; đã kiểm trên trình duyệt 29/10. Màu: phương án A (chỉ widget của nhóm). Tiếng Việt chọn ở Profile; widget đưa lên trên bảng bằng Tùy chỉnh trang |
 | BE-12 | Dọn dẹp, cập nhật `.env.template`, README | P3 | tất cả | [x] Xong · `1b9bda9`, `e8bf3c9`, `410c712`, `cbc4763`, `0660846`; xoá seed áo quần và route mẫu, test chạy được trên Windows (`cross-env`), README tiếng Anh, bảng API đồng bộ route thật |
-| AI-0 | Chuẩn bị nối 2 AI service: `AI_SERVICE_URL` (cổng 8100), hàm gọi AI có timeout và dự phòng, chốt `product_id` = `catalog_id`, hướng dẫn cho người nối | P2 | BE-9, BE-10 | [ ] Chưa làm (thêm 2026-11-05; làm sau plan storefront `2026-11-05-redis-vs-postgres.md`) |
+| AI-0 | Dọn đường nối 2 AI: hợp đồng backend ↔ AI service và storefront ↔ backend (thay BE-10), route giữ chỗ `/store/ai/*`, biến môi trường, cổng, trả lời câu hỏi của nhóm AI. **Không** gọi AI | P2 | BE-9, BE-10 | [x] Xong (2026-11-06) · `docs/contracts/ai-service.md`, `ai-copilot.md` |
 
 Ký hiệu: `[x]` xong và đã kiểm · `[~]` code và test xong nhưng còn bước kiểm tay hoặc phần thiếu · `[ ]` chưa làm. Cập nhật 2026-10-28, đối chiếu với code và nhật ký tiến độ của người làm backend; chi tiết từng task ở nhật ký đó và `docs/contracts/verified-apis.md`.
 
@@ -76,7 +76,7 @@ Mọi route `/store/*` cần `x-publishable-api-key`; route của khách cần t
 | API-5 | `order.metadata` | Mới (BE-6) | `stage`: `PENDING\|CONFIRMED\|PREPARING\|SHIPPING\|DELIVERED\|CANCELLED`; `stage_log`: `[{ stage, at, by }]` (`at` ISO; `by` là id admin, `seed` hoặc `backfill` nếu có). `code`: mã hiển thị. Đơn đặt từ giỏ được gán `C4F-YYMMDD-NNNN` (ngày đặt theo giờ VN, `display_id` đủ 4 số) ngay sau `order.placed`, bất đồng bộ như `stage`; đơn demo giữ mã của seed. FE đọc trực tiếp, **không tự suy ra** từ trạng thái Medusa; đổi stage do subscriber chạy bất đồng bộ nên đọc lại đơn sau khi thao tác. |
 | API-6 | `POST /store/orders/:id/cancel` (cần khách đăng nhập) | BE-8 | `200 { order: { id, status: "canceled" } }` sau khi hoàn tiền thành công (stage `CANCELLED` do subscriber đặt, đọc lại đơn); `409 { code: "ORDER_NOT_CANCELLABLE" }` khi `stage != PENDING`, đã huỷ hoặc còn fulfillment; `502 { code: "REFUND_FAILED" }` khi hoàn tiền lỗi (đơn giữ nguyên); `404` đơn lạ hoặc của khách khác; `401` chưa đăng nhập. |
 | API-7 | `order.metadata.delivery` | BE-7 | `{ driver_name, plate, distance_km, eta_at, started_at, notice_sent_at }`; chỉ có từ lúc `SHIPPING`. Ghi bởi `POST /admin/orders/:id/start-delivery` body `{ driver_name, plate }` (thiếu → 400; đơn không ở `PREPARING` → 409). |
-| API-8 | `POST /store/recipes/semantic-search`, `POST /store/assistant/chat` | Giữ chỗ ở BE-10 (kiểm body, trả `501 IN_DEVELOPMENT`); cài đặt thật cần AI service | Body và response: `src/types/assistant.ts`, giải thích ở `docs/contracts/assistant-recipes.md`. |
+| API-8 | `POST /store/ai/search`, `POST /store/ai/copilot` | AI-0 (thay BE-10); nhóm AI nối | Body `{ query, servings?, top_k?, have? }`; response theo hợp đồng của nhóm AI (`results[].basket.buy/maybe_have`, `accepted`; copilot thêm `ai`, `ai_status`), mỗi sản phẩm có thêm `variant` (biến thể, giá, tồn đã trừ phần đang giữ, `purchasable`). Hiện kiểm body rồi trả `501 IN_DEVELOPMENT`. Chi tiết: `docs/contracts/ai-copilot.md`, kiểu `src/types/ai.ts`. Route cũ `/store/recipes/semantic-search`, `/store/assistant/chat` đã bỏ. |
 | API-9 | `GET /admin/dashboard/summary` (+ `GET /admin/dashboard/low-stock?limit=`) | BE-11 | `{ revenue_today, orders_today, aov, low_stock_count, revenue_7d: number[] }`. Ngày theo giờ VN, theo ngày tạo đơn, bỏ đơn huỷ và nháp; `aov` là trung bình 7 ngày; `revenue_7d` cũ nhất trước. low-stock: `{ items: [{ product_id, title, variant_title, sku, available, low_stock }], count }`, tồn khả dụng <= `low_stock` (gồm hết hàng). |
 | API-10 | `GET /store/customers/me/vouchers` (cần khách đăng nhập) | BE-5b | `{ vouchers: [{ code, title, description, discountLabel, minSubtotal, endsAt, status: "usable"\|"not_eligible"\|"expired" }] }`: mã công khai và mã nhóm khách thuộc. Áp mã vào giỏ dùng route Medusa `POST /store/carts/:id/promotions`; mã chưa đủ điều kiện vẫn 200 nên phải đọc lại `discount_total`, chỉ mã không tồn tại mới 4xx. |
 | API-11 | `GET /store/vnpay/verify-return?<vnp_*>` | BE-5a | `{ valid, success }`: chỉ kiểm chữ ký và `vnp_ResponseCode` để trang return hiển thị; không đổi đơn. |
@@ -253,6 +253,8 @@ Mọi route `/store/*` cần `x-publishable-api-key`; route của khách cần t
 
 ## Task BE-10: Hợp đồng Trợ lý Bếp / Công thức
 
+> **Đã thay bằng AI-0 (2026-11-06):** hợp đồng dưới đây không còn dùng; xem task AI-0 và `docs/contracts/ai-copilot.md`.
+
 **Files:**
 - Create: `apps/backend/src/types/assistant.ts`
 - Create: `docs/contracts/assistant-recipes.md` (ví dụ JSON, dùng chung với FE)
@@ -288,27 +290,20 @@ Mọi route `/store/*` cần `x-publishable-api-key`; route của khách cần t
 - [x] Cập nhật `README.md`: viết lại bằng tiếng Anh theo repo thật (npm, Docker Postgres, seed `npm run seed`) (`0660846`).
 - [x] Rà bảng API mục 3 với route thật: sửa API-1, 2, 5, 6, 7; thêm API-10 đến 13. File FE không có bảng hợp đồng riêng (chỉ bảng giữ chỗ ở mục 4, vẫn đúng).
 
-## Task AI-0: Chuẩn bị nối 2 AI service
+## Task AI-0: Dọn đường nối 2 AI service
 
-> Thêm 2026-11-05 khi rà lại: hợp đồng FE ↔ BE của hai AI đã có (API-3, API-8; BE-9, BE-10) nhưng backend chưa có chỗ gọi AI service. Task này dọn đường để người nối AI (nhóm AI, Irvine cho AI #1) chỉ còn đổi phần xếp hạng hoặc phần trả lời. Làm **sau** plan storefront `2026-11-05-redis-vs-postgres.md`.
+> Thêm 2026-11-05, làm 2026-11-06. **Phạm vi chốt (noper1080):** chỉ thiết lập hợp đồng và cấu hình, **không** viết code gọi AI hay nối model; việc nối do nhóm AI làm (Irvine: "Mua lại" trên nhánh `reorder`; Phú Hưng: Trợ lý Bếp cả backend lẫn storefront, theo `docs/recipe_rag/plan-ai-copilot.md` mục 6 của repo AI). Hợp đồng Trợ lý Bếp theo bản của nhóm AI (thay BE-10).
 
-**Hiện trạng AI service** (`grocery-store-ai`, nhánh `feature/predictive-reorder`, 2026-11-05): `POST /api/v1/predict` chạy (LightGBM ONNX, model gate qua); request `{ orders: [{ placed_at, lines: [{ product_id, category }] }], at?, top_k (1–15, mặc định 5), lot_expiry? }`, response `{ status: "ready"|"empty", items: [{ product_id, score, rank }], suppressed, tau_applied, low_history, model_file }`; chưa có xác thực (chỉ mở trong mạng nội bộ); thiếu model thì trả `503`. Báo cáo của nhóm AI khuyên **không áp τ khi chỉ gợi ý 5 món** (API tự bỏ τ khi `top_k` khác 15). Trợ lý Bếp (issue #15) chưa có endpoint.
+**Files:** `docs/contracts/ai-service.md` (mới), `docs/contracts/ai-copilot.md` (thay `assistant-recipes.md`), `apps/backend/src/types/ai.ts` (thay `types/assistant.ts`), `apps/backend/src/api/store/ai/{search,copilot}`, `src/lib/ai/in-development.ts`, `src/api/middlewares.ts`, `integration-tests/http/ai-copilot.spec.ts`, `apps/backend/.env.template`, README. Bỏ: route `store/recipes`, `store/assistant`, `docs/contracts/fixtures/`, `tools/contracts/`.
 
-**Files:**
-- Modify: `apps/backend/.env.template`, `medusa-config.ts` hoặc `src/lib/ai/options.ts` (`AI_SERVICE_URL`, mặc định `http://localhost:8100`; `AI_TIMEOUT_MS`, mặc định 500)
-- Create: `apps/backend/src/lib/ai/client.ts` (+ unit test): `callAiService(path, body, { timeoutMs })` trả `{ ok: true, data }` hoặc `{ ok: false, reason: "timeout" | "unavailable" | "bad_response" }`, không ném lỗi
-- Modify: `src/workflows/get-reorder-basket.ts`: chỗ cắm sẵn `rankReorderItems` (gọi `/api/v1/predict`, lỗi thì dùng `pickReorderItems` bản tạm)
-- Create: `docs/contracts/ai-service.md`: hướng dẫn cho người nối AI
-
-**Xong khi:** tắt AI service thì API-3 vẫn trả giỏ theo bản tạm trong ≤ timeout; bật AI service có model thì API-3 xếp theo `/predict`; test unit cho client (timeout, 503, body sai) và test http cho cả hai nhánh (AI service giả bằng server HTTP trong test).
-
-- [ ] Chốt cổng **8100** (proposal; `uvicorn` mặc định 8000 trùng storefront). Ghi vào README backend và nhắn nhóm AI ghi vào README `grocery-store-ai` (`uvicorn src.main:app --port 8100`).
-- [ ] Chốt `product_id` gửi sang AI = **`catalog_id`** (= `sku` của biến thể): Trợ lý Bếp cũng tra món theo `catalog_id`, model dự đoán không dùng `product_id` làm feature. `category` = handle danh mục cha (11 handle, khớp `src/ml/category_map.json` của AI).
-- [ ] Client có timeout và dự phòng như proposal (quá 500 ms hoặc 503 thì dùng bản tạm), ghi log lý do.
-- [ ] `get-reorder-basket`: dựng `orders` từ đơn `DELIVERED` của khách (`query.graph`, tối đa 500 đơn), `top_k` = 5, ánh xạ `product_id` trả về sang biến thể để dựng response API-3 như cũ (giá, `in_stock`).
-- [ ] Ghi chú cho phần sau (không làm ở AI-0): cache giỏ trong Redis `basket:{customer_id}` và `warm` thật (proposal), nối Trợ lý Bếp khi #15 có endpoint.
-- [ ] `docs/contracts/ai-service.md`: chạy AI service ở đâu, cổng nào, **file model ONNX** (`weights/lgbm_v4_selected.onnx` không nằm trong git, xin Irvine hoặc chạy pipeline của repo AI), biến môi trường, hợp đồng `/predict`, cách kiểm bằng `curl`.
-- [ ] Commit `feat(ai): service client with timeout and fallback for the reorder basket`.
+- [x] Hợp đồng backend ↔ AI service cho `/api/v1/predict`, `/api/v1/search`, `/api/v1/copilot`: `X-Internal-Key`, timeout từng endpoint, dự phòng khi AI lỗi, cách dựng request "Mua lại" từ đơn đã giao (`product_id` = `catalog_id`, `category` = handle danh mục cha, `top_k` 5, không áp τ).
+- [x] Hợp đồng storefront ↔ backend của Trợ lý Bếp (API-8) theo dữ liệu của nhóm AI, thêm `variant` (biến thể, giá đang tính, tồn như API-15, `purchasable`) do backend gắn.
+- [x] Kiểu TypeScript cho cả hai lớp (`Ai*`, `Store*`) trong `src/types/ai.ts`.
+- [x] Route giữ chỗ `/store/ai/search`, `/store/ai/copilot`: kiểm body (zod), trả 501; route cũ trả 404; test http.
+- [x] Biến môi trường `AI_SERVICE_URL` (8100), `AI_INTERNAL_KEY`, `AI_PREDICT_TIMEOUT_MS`, `AI_SEARCH_TIMEOUT_MS`, `AI_COPILOT_TIMEOUT_MS` trong `.env.template` (chưa có code đọc). Chốt `AI_DB_PORT=5435` cho `ai_db` (5434 trùng Postgres backend).
+- [x] Trả lời câu hỏi nhóm AI đang chờ (plan AI mục 6): SKU = `catalog_id` (đối chiếu 2.129 id khớp), giá có hết, chưa có ảnh, 3 món ẩn không công thức nào dùng.
+- [ ] Nhóm AI xác nhận: tiền tố `/api/v1/search`, `/api/v1/copilot`; thêm `X-Internal-Key` cho `/api/v1/predict`; mã `503 AI_UNAVAILABLE` khi cả search lẫn copilot lỗi.
+- [x] Commit `feat(ai): contracts and placeholders for the two AI services` và `docs: AI-0 contracts`.
 
 ## 5. Cách chia đôi công việc khi sync dở
 
@@ -322,6 +317,7 @@ Mọi route `/store/*` cần `x-publishable-api-key`; route của khách cần t
 
 | Ngày | Người | Đã xong | Dở dang / lưu ý |
 | :--- | :--- | :--- | :--- |
+| 2026-11-06 | | AI-0: hợp đồng backend ↔ AI service (`docs/contracts/ai-service.md`) và storefront ↔ backend của Trợ lý Bếp (`ai-copilot.md`, theo bản của nhóm AI, thay BE-10), kiểu `src/types/ai.ts`, route giữ chỗ `/store/ai/*` (501), biến môi trường AI, cổng 8100 / 5435. Không gọi AI | Chờ nhóm AI xác nhận tiền tố `/api/v1/*`, `X-Internal-Key` cho `/predict`, mã `AI_UNAVAILABLE`. Nhánh `reorder` cần rebase lên `dev` sau PR |
 | 2026-11-06 | | Sau khi rà storefront: sửa HS-6b (`stock_failed` theo từng giao dịch, `6b72fa5`), HS-8b (API-15 nhận `cart_id`, `3238daf`); storefront đã nối API-14/15/16 (plan storefront `2026-11-05-redis-vs-postgres.md`), kiểm trên trình duyệt. Thêm AI-0. Unit 123, module 31, integration 20 suite / 92 test | AI-0 chưa làm. Danh sách sản phẩm vẫn theo chỉ mục tìm kiếm (R6 còn một phần) |
 | 2026-11-04 | | Redis hot-stock và tồn real-time (plan `2026-11-03-redis-hot-stock.md`, HS-0 đến HS-8): API-14 giữ hàng trước VNPAY, API-12 đổi (trả hàng khi thanh toán lỗi, hoàn tiền và `cart.metadata.stock_failed` khi hết hàng, link 10 phút), API-15 `GET /store/stock`, API-16 Socket.io (`apps/realtime-gateway`, cổng 4001). Unit 122, module 31, gateway 5, integration 20 suite / 89 test | **Backend cần container Redis** (README mục 2b) và `npm install`. FE chưa nối API-14/15/16 (việc của FE, xem bảng API). HS-6 chỉ kiểm với VNPAY giả lập; HS-9 hoãn. Rủi ro còn mở: `docs/known-risks.md` |
 | 2026-11-03 | | Câu 11, 13 của plan FE (mục 2b): đơn mới có `metadata.code` `C4F-YYMMDD-NNNN` (`src/workflows/assign-order-code.ts`, subscriber `order-code-placed.ts`, cùng khoá với set-order-stage để hai subscriber của `order.placed` không ghi đè metadata của nhau); `VNPAY_RETURN_URL` mặc định thêm `/vn` (`medusa-config.ts`, `options.ts`, `.env.template`). Unit 113 test, integration xem commit | `.env` đã tạo từ template trước đây vẫn giữ URL cũ (vẫn chạy nhờ middleware FE tự thêm `/vn`), sửa tay nếu muốn. Đơn thật đặt trước thay đổi này không có mã, FE hiện `#display_id` |

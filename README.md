@@ -10,7 +10,7 @@ Medusa handles the commerce core (catalog, prices, cart, orders, inventory, auth
 - VNPAY as the only payment provider (signed payment URL, IPN, refunds)
 - Vouchers and a customer voucher wallet
 - Order stages (`PENDING → CONFIRMED → PREPARING → SHIPPING → DELIVERED`, or `CANCELLED`) driven by Medusa events, customer cancel with refund, "start delivery" with driver and ETA
-- "Buy it again" basket (frequency-based placeholder for the LightGBM module) and the kitchen assistant contract (routes return 501 until the AI service is connected)
+- "Buy it again" basket (frequency-based placeholder for the LightGBM module) and the contracts for the two AI features: backend ↔ AI service and storefront ↔ backend (the kitchen assistant routes `/store/ai/*` return 501 until the AI team connects them)
 - Admin widgets: summary, low stock, delivery
 - Stock holds in Redis before payment (atomic Lua scripts) and live stock over Socket.io
 
@@ -31,7 +31,7 @@ apps/realtime-gateway/  Socket.io gateway for live stock (Redis Pub/Sub)
   src/lib/seed/       store bootstrap, catalog, promotions, demo data
   src/admin/          admin widgets and Vietnamese labels
   integration-tests/  HTTP integration tests
-docs/contracts/       verified Medusa API facts, assistant contract and fixtures
+docs/contracts/       verified Medusa API facts, AI service and kitchen assistant contracts
 docs/plans/           task plan and API contract
 tools/                Python scripts that build seed data and contract fixtures
 ```
@@ -178,6 +178,10 @@ npm test --workspace=@dtc/realtime-gateway            # needs the Redis containe
 
 The storefront first calls `GET /store/stock?variant_ids=...&cart_id=...` (API-15) for the current numbers (net of other customers' holds, with this cart's own hold added back as `held_by_cart`) and the `inventory_item_id` of each variant, then emits `subscribe { inventory_item_ids }` and listens to `stock:update`. The gateway runs TypeScript directly with `node --experimental-strip-types` (Node 22.12+), so it has no build step. Contract: API-15 and API-16 in the plan's API table.
 
+## AI service
+
+The two AI features live in the `grocery-store-ai` repo (FastAPI) and are connected to the backend by the AI team. The backend only fixes the contracts so far ([`docs/contracts/ai-service.md`](docs/contracts/ai-service.md)): run the AI service on port **8100** (`uvicorn src.main:app --port 8100`, 8000 is the storefront) and its `ai_db` on **5435** (`AI_DB_PORT=5435`, 5434 is this backend's Postgres). `AI_SERVICE_URL`, `AI_INTERNAL_KEY` and the `AI_*_TIMEOUT_MS` variables are in `apps/backend/.env.template`; nothing reads them yet.
+
 ## VNPAY (sandbox)
 
 - Credentials come in the sandbox.vnpayment.vn sign-up email; put them in `apps/backend/.env` only.
@@ -199,5 +203,6 @@ Open `http://localhost:9000/app`.
 - [`docs/contracts/verified-apis.md`](docs/contracts/verified-apis.md): Medusa 2.21.1 behavior checked by running it, per task
 - [`docs/known-risks.md`](docs/known-risks.md): open risks (VNPAY refunds, holds, payment sessions)
 - [`docs/hot-stock.md`](docs/hot-stock.md) (outline, Vietnamese) and [`docs/hot-stock-results.md`](docs/hot-stock-results.md): stock holds, H4 experiment and latency numbers; rerun the Redis benchmark with `npx medusa exec ./src/scripts/bench-hot-stock.ts`
-- [`docs/contracts/assistant-recipes.md`](docs/contracts/assistant-recipes.md): kitchen assistant and recipe contract
+- [`docs/contracts/ai-service.md`](docs/contracts/ai-service.md) (Vietnamese): backend ↔ AI service contract for both AI features, ports, environment variables, who does what
+- [`docs/contracts/ai-copilot.md`](docs/contracts/ai-copilot.md) (Vietnamese): kitchen assistant contract between storefront and backend (API-8)
 - [Medusa documentation](https://docs.medusajs.com)
