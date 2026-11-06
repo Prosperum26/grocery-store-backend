@@ -1,15 +1,31 @@
 import { MedusaError } from "@medusajs/framework/utils"
-import type { AiCopilotResponse, AiSearchRequest, AiSearchResponse } from "../../types/ai"
+import type {
+  AiAskRequest,
+  AiAskResponse,
+  AiCopilotResponse,
+  AiRecipeDetail,
+  AiRecipeRequest,
+  AiSearchRequest,
+  AiSearchResponse,
+} from "../../types/ai"
 
 // Gọi AI service (docs/contracts/ai-service.md, mục 5). Chỉ làm việc mạng; gắn giá, tồn ở lib/ai/attach-variants.ts.
 
 /** Mã lỗi khi không lấy được câu trả lời nào từ AI service. Route đổi thành 503 (hợp đồng ai-copilot.md, mục 4). */
 export const AI_UNAVAILABLE = "AI_UNAVAILABLE"
 
-type Endpoint = "search" | "copilot"
+/** Mã lỗi khi AI service báo không có món với recipe_id đó (404). Route đổi thành 404. */
+export const AI_RECIPE_NOT_FOUND = "AI_RECIPE_NOT_FOUND"
 
-const TIMEOUT_ENV: Record<Endpoint, string> = { search: "AI_SEARCH_TIMEOUT_MS", copilot: "AI_COPILOT_TIMEOUT_MS" }
-const TIMEOUT_DEFAULT_MS: Record<Endpoint, number> = { search: 3000, copilot: 35000 }
+type Endpoint = "search" | "copilot" | "recipe" | "ask"
+
+const TIMEOUT_ENV: Record<Endpoint, string> = {
+  search: "AI_SEARCH_TIMEOUT_MS",
+  copilot: "AI_COPILOT_TIMEOUT_MS",
+  recipe: "AI_RECIPE_TIMEOUT_MS",
+  ask: "AI_ASK_TIMEOUT_MS",
+}
+const TIMEOUT_DEFAULT_MS: Record<Endpoint, number> = { search: 3000, copilot: 35000, recipe: 3000, ask: 35000 }
 
 const unavailable = (message: string, cause?: unknown) => {
   const error = new MedusaError(MedusaError.Types.UNEXPECTED_STATE, message, AI_UNAVAILABLE)
@@ -34,7 +50,7 @@ const isSearchResponse = (value: any): value is AiSearchResponse => Array.isArra
 /** POST tới AI service. Mọi lỗi (mạng, quá giờ, khác 2xx, body sai) thành MedusaError mang mã AI_UNAVAILABLE. */
 export async function callAiService(
   endpoint: Endpoint,
-  body: AiSearchRequest,
+  body: object,
   fetchImpl: typeof fetch = fetch
 ): Promise<unknown> {
   const { baseUrl, key, timeoutMs } = config(endpoint)
@@ -49,6 +65,9 @@ export async function callAiService(
   } catch (e) {
     const timedOut = e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError")
     throw unavailable(timedOut ? `AI service ${endpoint} timed out after ${timeoutMs} ms` : `AI service ${endpoint} unreachable`, e)
+  }
+  if (response.status === 404 && (endpoint === "recipe" || endpoint === "ask")) {
+    throw new MedusaError(MedusaError.Types.NOT_FOUND, "Recipe not found", AI_RECIPE_NOT_FOUND)
   }
   if (!response.ok) {
     throw unavailable(`AI service ${endpoint} answered ${response.status}`)
@@ -88,4 +107,22 @@ export async function aiCopilot(body: AiSearchRequest, fetchImpl: typeof fetch =
     const data = await aiSearch(body, fetchImpl)
     return { data, ai: null, ai_status: "fallback_error", latency_ms: Date.now() - started }
   }
+}
+
+/** /api/v1/recipe: công thức, các bước và giỏ nguyên liệu theo số người. Không có bản dự phòng: lỗi thì ném AI_UNAVAILABLE. */
+export async function aiRecipe(body: AiRecipeRequest, fetchImpl: typeof fetch = fetch): Promise<AiRecipeDetail> {
+  const data = await callAiService("recipe", body, fetchImpl)
+  if (!Array.isArray((data as any)?.basket?.buy) || typeof (data as any)?.recipe?.id !== "string") {
+    throw unavailable("AI service recipe returned an unexpected body")
+  }
+  return data as AiRecipeDetail
+}
+
+/** /api/v1/ask: câu trả lời cho câu khách hỏi thêm. Mô hình lỗi thì AI service vẫn trả 200 với `answer: null`. */
+export async function aiAsk(body: AiAskRequest, fetchImpl: typeof fetch = fetch): Promise<AiAskResponse> {
+  const data = await callAiService("ask", body, fetchImpl)
+  if (typeof (data as any)?.status !== "string" || !("answer" in (data as object))) {
+    throw unavailable("AI service ask returned an unexpected body")
+  }
+  return data as AiAskResponse
 }

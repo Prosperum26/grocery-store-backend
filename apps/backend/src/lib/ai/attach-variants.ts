@@ -15,9 +15,13 @@ const itemsOf = (basket: AiBasket): AiBasketItem[] => [...basket.buy, ...basket.
 
 /** Mọi catalog_id xuất hiện trong kết quả (sản phẩm chính và phương án thay thế), không trùng, giữ thứ tự gặp. */
 export function catalogIdsOf(data: AiSearchResponse): string[] {
+  return catalogIdsOfBaskets(data.results.map((result) => result.basket))
+}
+
+export function catalogIdsOfBaskets(baskets: AiBasket[]): string[] {
   const ids = new Set<string>()
-  for (const result of data.results) {
-    for (const item of itemsOf(result.basket)) {
+  for (const basket of baskets) {
+    for (const item of itemsOf(basket)) {
       ids.add(item.product.catalog_id)
       item.alternatives.forEach((alt) => ids.add(alt.catalog_id))
     }
@@ -71,16 +75,18 @@ function attachItem(item: AiBasketItem, info: Map<string, StoreVariantInfo>): St
   }
 }
 
+/** Gắn `variant` cho một giỏ (màn công thức dùng trực tiếp). */
+export function attachBasket(basket: AiBasket, info: Map<string, StoreVariantInfo>): StoreBasket {
+  return { buy: basket.buy.map((item) => attachItem(item, info)), maybe_have: basket.maybe_have.map((item) => attachItem(item, info)) }
+}
+
 /** Trả bản sao có `variant` ở từng dòng giỏ và từng phương án thay thế; mọi trường khác của AI giữ nguyên. */
 export function attachVariants(data: AiSearchResponse, info: Map<string, StoreVariantInfo>): AiSearchResponse<StoreBasket> {
   return {
     ...data,
     results: data.results.map((result) => ({
       ...result,
-      basket: {
-        buy: result.basket.buy.map((item) => attachItem(item, info)),
-        maybe_have: result.basket.maybe_have.map((item) => attachItem(item, info)),
-      },
+      basket: attachBasket(result.basket, info),
     })),
   }
 }
