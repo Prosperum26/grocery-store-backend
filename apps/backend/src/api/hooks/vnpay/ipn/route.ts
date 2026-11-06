@@ -4,6 +4,8 @@ import { fromVnpAmount } from "../../../../modules/vnpay/lib/amount"
 import { vnpayOptionsFromEnv } from "../../../../modules/vnpay/lib/options"
 import { verifyParams } from "../../../../modules/vnpay/lib/signature"
 import { parseTxnRef } from "../../../../modules/vnpay/lib/txn-ref"
+import { guardPaidCartStockWorkflow } from "../../../../workflows/guard-paid-cart-stock"
+import { releaseCartHoldWorkflow } from "../../../../workflows/release-cart-hold"
 
 // Id provider mà payment module nhận: nó tự thêm tiền tố "pp_" (pp_vnpay_vnpay trong DB).
 const WEBHOOK_PROVIDER = "vnpay_vnpay"
@@ -50,7 +52,7 @@ async function handleIpn(req: MedusaRequest) {
   const graph = req.scope.resolve(ContainerRegistrationKeys.QUERY)
   const { data: sessions } = await graph.graph({
     entity: "payment_session",
-    fields: ["id", "amount", "currency_code", "status", "provider_id", "data", "payment.id"],
+    fields: ["id", "amount", "currency_code", "status", "provider_id", "data", "payment.id", "payment_collection_id"],
     filters: { id: sessionId },
   })
   const session = sessions[0] as any
@@ -74,12 +76,44 @@ async function handleIpn(req: MedusaRequest) {
     return RESPONSES.alreadyConfirmed
   }
 
-  // 5. Thanh toán không thành công (khách huỷ, hết hạn...): ghi nhận đã nhận tin, không đổi gì.
+  // Giỏ của phiên, để giữ hoặc trả hàng (hot-stock). Link cart_payment_collection như compensation của Medusa.
+  const { data: links } = await graph.graph({
+    entity: "cart_payment_collection",
+    fields: ["cart_id"],
+    filters: { payment_collection_id: session.payment_collection_id },
+  })
+  const cartId = (links[0] as { cart_id?: string } | undefined)?.cart_id
+
+  // 5. Thanh toán không thành công (khách huỷ, hết hạn...): trả hàng đang giữ ngay (hot-stock HS-6),
+  //    không đổi gì khác. Khách thử trả lại thì storefront gọi giữ hàng lần nữa.
   if (query.vnp_ResponseCode !== "00" || query.vnp_TransactionStatus !== "00") {
+    if (cartId) {
+      await releaseCartHoldWorkflow(req.scope).run({ input: { cart_id: cartId } })
+    }
     return RESPONSES.ok
   }
 
-  // 6. Thanh toán thành công. Ghi dấu đã trả vào phiên: authorizePayment của provider chỉ cho
+  // 6a. Đã trả tiền: kiểm hàng còn được giữ cho giỏ không (hot-stock D4) TRƯỚC khi đánh dấu đã trả.
+  //     Hold hết hạn thì giữ lại; hết hàng thì hoàn tiền, ghi cart.metadata.stock_failed và không tạo đơn
+  //     (phiên không có dấu paid nên giỏ cũng không hoàn tất được bằng `complete`).
+  if (cartId && session.data?.paid !== true) {
+    const { result: guard } = await guardPaidCartStockWorkflow(req.scope).run({
+      input: {
+        cart_id: cartId,
+        txn_ref: query.vnp_TxnRef,
+        session: { amount: session.amount, data: session.data ?? {} },
+        vnp_transaction_no: query.vnp_TransactionNo,
+      },
+    })
+    if (guard.status === "already_failed") {
+      return RESPONSES.alreadyConfirmed
+    }
+    if (guard.status === "out_of_stock") {
+      return RESPONSES.ok
+    }
+  }
+
+  // 6b. Thanh toán thành công và còn hàng. Ghi dấu đã trả vào phiên: authorizePayment của provider chỉ cho
   //    "authorized" khi có dấu này, nên không thể hoàn tất giỏ trước khi VNPAY xác nhận.
   //    Cũng lưu mã giao dịch VNPAY để BE-8 hoàn tiền. Gọi lại khi đã có dấu thì chỉ phát lại event
   //    (phòng event lần trước bị mất); workflow xử lý lặp là an toàn vì khoá theo giỏ.

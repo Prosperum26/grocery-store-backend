@@ -98,13 +98,13 @@ describe("VnpayProviderService.initiatePayment", () => {
     expect(second.data?.txn_ref).not.toBe(first.data?.txn_ref)
   })
 
-  it("payment_url có vnp_Amount ×100, ExpireDate = CreateDate + 15 phút, chữ ký hợp lệ", async () => {
+  it("payment_url có vnp_Amount ×100, ExpireDate = CreateDate + 10 phút, chữ ký hợp lệ", async () => {
     const out = await service().initiatePayment(input())
     const p = Object.fromEntries(new URL(out.data?.payment_url as string).searchParams)
     expect(p.vnp_Amount).toBe("39000000")
     const toMs = (s: string) =>
       Date.UTC(+s.slice(0, 4), +s.slice(4, 6) - 1, +s.slice(6, 8), +s.slice(8, 10), +s.slice(10, 12), +s.slice(12, 14))
-    expect(toMs(p.vnp_ExpireDate) - toMs(p.vnp_CreateDate)).toBe(15 * 60 * 1000)
+    expect(toMs(p.vnp_ExpireDate) - toMs(p.vnp_CreateDate)).toBe(10 * 60 * 1000)
     expect(verifyParams(p, TEST_OPTIONS.hashSecret)).toBe(true)
   })
 

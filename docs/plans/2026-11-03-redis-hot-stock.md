@@ -12,17 +12,19 @@
 
 | Task | Nội dung | Phụ thuộc | Trạng thái |
 | :--- | :--- | :--- | :--- |
-| HS-0 | Spike: kiểm các hành vi Medusa mà plan dựa vào | | [ ] |
-| HS-1 | Redis, `ioredis`, khung module `hot-stock` | HS-0 | [ ] |
-| HS-2 | Chuyển 3 script Lua vào module, sửa lỗi, test jest | HS-1 | [ ] |
-| HS-3 | Bản sao tồn kho trong Redis: dựng từ Postgres, đồng bộ, đối soát | HS-2 | [ ] |
-| HS-4 | Workflow và route giữ hàng (API-14) | HS-3 | [ ] |
-| HS-5 | Vòng đời hold: xác nhận khi có đơn, hết hạn | HS-4 | [ ] |
-| HS-6 | VNPAY: link 10 phút, nhả khi thất bại, lưới an toàn khi IPN tới muộn | HS-5 | [ ] |
-| HS-7 | Thí nghiệm H4, đo P95, dàn ý `docs/hot-stock.md` | HS-6 | [ ] |
-| HS-8 | Pub/Sub → Socket.io gateway và `GET /store/stock` | HS-3 | [ ] |
-| HS-9 | (Tùy chọn) Module Redis của Medusa: event bus, workflow engine, locking | HS-7 | [ ] |
-| HS-10 | Tài liệu: README, `.env.template`, bảng API, nhật ký | tất cả | [ ] |
+| HS-0 | Spike: kiểm các hành vi Medusa mà plan dựa vào | | [x] Xong · kết quả ở `verified-apis.md` mục HS-0 |
+| HS-1 | Redis, `ioredis`, khung module `hot-stock` | HS-0 | [x] Xong · xem task HS-1 |
+| HS-2 | Chuyển 3 script Lua vào module, sửa lỗi, test jest | HS-1 | [x] Xong · 29 test trên Redis thật (`npm run test:integration:modules`) |
+| HS-3 | Bản sao tồn kho trong Redis: dựng từ Postgres, đồng bộ, đối soát | HS-2 | [x] Xong · 7 test http, dựng 2.129 món trên DB dev |
+| HS-4 | Workflow và route giữ hàng (API-14) | HS-3 | [x] Xong · 7 test http |
+| HS-5 | Vòng đời hold: xác nhận khi có đơn, hết hạn | HS-4 | [x] Xong · 5 test http |
+| HS-6 | VNPAY: link 10 phút, nhả khi thất bại, lưới an toàn khi IPN tới muộn | HS-5 | [~] Code và test xong (IPN giả lập, API hoàn tiền giả lập bằng `jest.spyOn(fetch)`); chưa kiểm trên sandbox thật (D0) |
+| HS-7 | Thí nghiệm H4, đo P95, dàn ý `docs/hot-stock.md` | HS-6 | [x] Xong · số đo ở `docs/hot-stock-results.md` |
+| HS-8 | Pub/Sub → Socket.io gateway và `GET /store/stock` | HS-3 | [x] Xong · gateway `apps/realtime-gateway`, API-15, API-16 |
+| HS-9 | (Tùy chọn) Module Redis của Medusa: event bus, workflow engine, locking | HS-7 | Hoãn (2026-11-04): backend chạy một tiến trình, chưa cần; xem task HS-9 và R7 |
+| HS-10 | Tài liệu: README, `.env.template`, bảng API, nhật ký | tất cả | [x] Xong · cập nhật theo từng task; nhật ký ngoài repo 2026-11-04 |
+| HS-6b | Sửa: `stock_failed` theo từng giao dịch (`txn_ref`), thanh toán lại sau khi bị hoàn tiền không bị nuốt (= RB-1 của plan storefront `2026-11-05-redis-vs-postgres.md`) | HS-6 | [x] Xong · 2 test http |
+| HS-8b | API-15 nhận `cart_id`, trả `held_by_cart` (= RB-2 của plan storefront `2026-11-05-redis-vs-postgres.md`) | HS-8 | [x] Xong · 1 test http, 1 unit |
 
 Ký hiệu như plan `2026-10-18`: `[x]` xong và đã kiểm · `[~]` code và test xong nhưng còn phần kiểm tay · `[ ]` chưa làm.
 
@@ -102,7 +104,7 @@ Ví dụ cho nhánh cuối (kho còn 1 hộp dâu): A giữ ở 0:00, trả ti�
 ```text
 apps/backend/src/modules/hot-stock/
   index.ts, service.ts          HotStockModuleService: reserve, release, confirm, expireDue, syncItems
-  lua/*.lua                     reserve_hold, release_hold, confirm_hold, sync_item
+  lua/*.ts                      reserve_hold, release_hold, confirm_hold, sync_item (chuỗi Lua)
   lib/keys.ts                   dựng tên key (hàm thuần, có unit test)
 apps/backend/src/workflows/
   reserve-cart-stock.ts         đọc giỏ → gộp dòng → giữ hàng; compensation: release
@@ -127,10 +129,14 @@ apps/realtime-gateway/                                     (HS-8)
 
 Những API khác (API-1 đến 13) không đổi. `inventory_quantity` trong Store API vẫn là số của Medusa (chưa trừ phần đang giữ).
 
-## 4. Câu hỏi mở
+## 4. Câu hỏi mở và rủi ro
+
+Rủi ro chưa xử lý được gom ở [`docs/known-risks.md`](../known-risks.md) (R1–R6); khi sửa xong thì cập nhật dòng ở đó.
 
 - **O1:** Có chặn tạo payment session khi giỏ chưa giữ hàng không? Hiện **không**: nhánh D4 của IPN đã xử lý trường hợp khách bỏ qua API-14. Chặn thêm thì phải sửa route Medusa có sẵn, nên chỉ làm nếu thầy hỏi.
 - **O2:** Hoàn tiền khi IPN hết hàng (D4) dùng `refund-client.ts` của BE-8, và chưa kiểm được trên sandbox (giống BE-8). Gọi API hoàn tiền thất bại thì ghi `stock_failed.refund = "failed"` để Admin xử lý tay.
+- **R1 (HS-0):** khách mở 2 lần thanh toán: phiên VNPAY cũ bị xoá, trả bằng link cũ thì IPN trả `01`, tiền đã thu mà không có đơn. Có từ trước hot-stock; link 10 phút (D2) thu hẹp khoảng này. Có thể sửa sau bằng cách IPN tra phiên `withDeleted` rồi hoàn tiền; chưa làm trong plan.
+- **R2 (HS-0):** Medusa tự hoàn tiền khi hoàn tất giỏ lỗi sau khi đã thu tiền, nhưng hoàn tiền lỗi thì chỉ ghi log. Xử lý phát hiện ở HS-6.
 - **O3:** HS-9 bật event bus Redis thì mọi subscriber (BE-3, BE-6, IPN) chạy qua hàng đợi. Chỉ làm nếu còn thời gian và chạy lại toàn bộ test.
 
 ---
@@ -139,12 +145,12 @@ Những API khác (API-1 đến 13) không đổi. `inventory_quantity` trong St
 
 **Xong khi:** mỗi câu dưới đây có câu trả lời đã chạy thật, ghi vào `verified-apis.md` mục HS-0. Câu nào khác giả định thì sửa thiết kế ở mục 2 trước khi làm tiếp.
 
-- [ ] Payload của `inventory-level.created/updated/deleted` và `reservation-item.created/updated/deleted` (chỉ có `id`? đọc lại được bản ghi đã xoá không?). Hủy đơn (`cancelOrderWorkflow`, BE-8) và hoàn tất giỏ có phát các event này không.
-- [ ] Hoàn tất giỏ tạo reservation trước hay sau `order.placed`; `order.placed` có `data.id` là order id. Tra cart từ order qua link `order_cart` bằng `query.graph`.
-- [ ] Biến thể → `inventory_items[].inventory_item_id`, `required_quantity` (catalog hiện có 1 item mỗi biến thể; vẫn nhân `required_quantity`).
-- [ ] Tạo payment session mới cho giỏ đã có session VNPAY thì session cũ bị xoá hay giữ (ảnh hưởng IPN tìm phiên).
-- [ ] Hoàn tất giỏ thiếu hàng trong Postgres thì `processPaymentWorkflow` báo lỗi gì và để lại trạng thái gì.
-- [ ] Module tự viết nhận `options` từ `medusa-config.ts` và dọn kết nối khi tắt (`__hooks.onApplicationShutdown` hoặc tương đương 2.21.1); cấu hình scheduled job (`config.schedule`).
+- [x] `inventory-level.*` gửi `{ id }` (id level); `reservation-item.*` gửi `{ id, order_id }`. Hoàn tất giỏ phát `reservation-item.created` nhưng **không** phát `inventory-level.updated`; hủy đơn phát `reservation-item.deleted`. Bản đã xoá đọc được bằng `withDeleted: true`.
+- [x] Cả hai event phát sau khi workflow xong (reservation đã có trong Postgres khi subscriber chạy). `order.placed { id }` là order id; cart qua `order_cart` hoặc `order.cart.id`.
+- [x] Biến thể có `manage_inventory`, `inventory_items[].inventory_item_id`, `required_quantity` (= 1 trong catalog).
+- [x] Phiên cũ bị xoá. Trả bằng link cũ thì IPN trả `01`, đã thu tiền mà không có đơn: rủi ro R1 (mục 4).
+- [x] Payment captured trước, hoàn tất giỏ lỗi `Not enough stock...`; Medusa tự hoàn tiền (`refundPaymentAndRecreatePaymentSessionWorkflow`) và tạo phiên mới. Hoàn tiền lỗi thì chỉ ghi log: rủi ro R2 (mục 4).
+- [x] `__hooks.onApplicationShutdown` có trong 2.21.1; job export `config { name, schedule }`. `medusa build` không chép `.lua`, nên Lua nhúng trong `.ts`.
 
 ## Task HS-1: Redis, `ioredis`, khung module
 
@@ -152,24 +158,25 @@ Những API khác (API-1 đến 13) không đổi. `inventory_quantity` trong St
 
 **Xong khi:** `npm run backend:dev` có Redis thì khởi động bình thường, không có thì báo lỗi rõ (D8); test kiểm `service.ping()`.
 
-- [ ] Container: `docker run -d --name com4fud-redis -p 6379:6379 -v com4fud-redisdata:/data --restart unless-stopped redis/redis-stack-server:7.2.0-v10` với AOF (`REDIS_ARGS="--appendonly yes"`). Kiểm tag có thật trước khi ghi vào README.
-- [ ] `npx npm@10.9.8 install ioredis@5.11.1 --workspace=@dtc/backend` (cùng bản Medusa đang dùng; **không** dùng `^6.0.0` của repo thử).
-- [ ] Đăng ký module `./src/modules/hot-stock` với options `{ redisUrl, prefix, holdTtlSeconds: 900, locationName: "Kho Q.7" }`; test dùng prefix riêng và xoá key theo prefix sau mỗi suite.
+- [x] Container: `docker run -d --name com4fud-redis -p 6379:6379 -v com4fud-redisdata:/data --restart unless-stopped redis/redis-stack-server:7.2.0-v10` với AOF (`REDIS_ARGS="--appendonly yes"`). Tag đã pull được, Redis 7.2.4, `appendonly yes`; README mục 2b.
+- [x] `npx npm@10.9.8 install ioredis@5.11.1 --workspace=@dtc/backend` (cùng bản Medusa đang dùng; **không** dùng `^6.0.0` của repo thử).
+- [x] Module `hotStock` (`src/modules/hot-stock`): loader mở một kết nối `ioredis` và ping, lỗi thì Medusa dừng khởi động (đã thử khi tắt container); không dùng `__hooks.onApplicationStart` vì Medusa nuốt lỗi của hook này. Options `{ redisUrl, prefix }` (`holdTtlSeconds` mặc định 900); `NODE_ENV=test` dùng tiền tố `c4f-test:` (tham số `env` của test runner không tới được `medusa-config`). `locationName` để HS-3. Xoá key theo tiền tố làm ở HS-2 khi có key.
 - [ ] Commit `feat(hot-stock): redis connection and module skeleton`.
 
 ## Task HS-2: Script Lua
 
-**Files:** `src/modules/hot-stock/lua/*.lua`, `service.ts`, `lib/keys.ts`, `src/modules/hot-stock/__tests__/*.spec.ts`.
+**Files:** `src/modules/hot-stock/lua/*.ts`, `service.ts`, `lib/keys.ts`, `src/modules/hot-stock/__tests__/*.spec.ts`.
 
 **Xong khi:** các test của repo thử (bước 1–3) chạy bằng jest trên Redis thật, cộng các ca mới dưới đây.
 
-- [ ] Chuyển `reserve_hold`, `release_hold`, `confirm_hold` từ `test-medusa-goc/apps/backend/src/redis-hold/lua`; giữ comment, giữ quy ước mã trả về (`1`, `0`, `-1`, `-2`, `-3`).
-- [ ] **Sửa 1 (D5):** hold đang `HELD` thì cộng trả rồi giữ lại theo giỏ mới; hold `RELEASED`/`EXPIRED` thì ghi đè; `CONFIRMED` trả `3`.
-- [ ] **Sửa 2:** `release_hold` nhận đủ key qua `KEYS` (không lấy tên key từ field rồi ghi), đúng quy tắc khai báo key của Redis.
-- [ ] Thêm bộ đếm `stock:held:*` trong cả 3 script; thêm `sync_item.lua` (mục 2.2).
-- [ ] Service nạp script một lần bằng `defineCommand`, đọc file `.lua` bằng `readFileSync` theo `__dirname`. Kiểm `medusa build` có chép file `.lua` vào `.medusa/server` không; không thì nhúng nội dung script vào file `.ts`.
-- [ ] Test: 100 lần giữ đồng thời tranh 5 món × 20 lượt (đúng 5 thành công, `avail ≥ 0`); giỏ nhiều món tất cả hoặc không; giữ lại sau `EXPIRED` thì trừ lại thật; giữ lại khi giỏ đổi số lượng; confirm và release chạy đua; `expireDue` song song; `sync_item` chen giữa các lần giữ.
-- [ ] Commit `feat(hot-stock): atomic hold scripts ported from issue #9`.
+- [x] Chuyển `reserve_hold`, `release_hold`, `confirm_hold` từ `test-medusa-goc/apps/backend/src/redis-hold/lua`; giữ comment, giữ quy ước mã trả về (`1`, `0`, `-1`, `-2`, `-3`).
+- [x] **Sửa 1 (D5):** hold đang `HELD` thì cộng trả rồi giữ lại theo giỏ mới; hold `RELEASED`/`EXPIRED` thì ghi đè; `CONFIRMED` trả `3`.
+- [x] **Sửa 2:** `release_hold` nhận đủ key qua `KEYS` (không lấy tên key từ field rồi ghi), đúng quy tắc khai báo key của Redis.
+- [x] Thêm bộ đếm `stock:held:*` trong cả 3 script; thêm `sync_item.lua` (mục 2.2).
+- [x] Service nạp script một lần bằng `defineCommand`. Script là chuỗi hằng trong `lua/*.ts` (HS-0: `medusa build` không chép `.lua`); giữ định dạng nhiều dòng và comment để đọc được.
+- [x] Test: 100 lần giữ đồng thời tranh 5 món × 20 lượt (đúng 5 thành công, `avail ≥ 0`); giỏ nhiều món tất cả hoặc không; giữ lại sau `EXPIRED` thì trừ lại thật; giữ lại khi giỏ đổi số lượng; confirm và release chạy đua; `expireDue` song song; `sync_item` chen giữa các lần giữ.
+- [x] **Khác dự kiến:** để khai báo đủ key, service đọc hold cũ trước rồi truyền key của nó vào `KEYS`; script kiểm lại, hold vừa bị đổi thì trả `-4` và service đọc lại (tối đa 5 lần, nghỉ ngẫu nhiên vài ms). Dồn 30 lần sửa **cùng một giỏ** đồng thời thì vài lần có thể bỏ cuộc với lỗi `kept changing` (số tồn vẫn đúng); ngoài đời không xảy ra. Script nhận số lượng 0 cho món chỉ có trong hold cũ, nên service tự kiểm số lượng dòng mới > 0. `sync_item` để `avail` âm khi admin giảm tồn dưới phần đang giữ (không ai giữ thêm được), không ép về 0 vì sẽ làm sai phép cộng khi hold được trả. Test module chạy bằng `test:integration:modules` (đã sửa `testMatch` để bỏ `*.unit.spec` và file không phải test).
+- [x] Commit `feat(hot-stock): atomic hold scripts ported from issue #9`.
 
 ## Task HS-3: Bản sao tồn kho
 
@@ -177,73 +184,77 @@ Những API khác (API-1 đến 13) không đổi. `inventory_quantity` trong St
 
 **Xong khi:** sau seed, mọi item có key đúng `stocked − reserved`; admin sửa tồn trong Admin thì key đổi trong vài giây; hủy đơn thì key tăng lại; test đối chiếu Redis với Postgres.
 
-- [ ] Workflow `sync-hot-stock` nhận `inventory_item_ids` (hoặc rỗng = toàn bộ), đọc inventory level tại Kho Q.7 bằng `query.graph`, chạy `sync_item` theo lô.
-- [ ] Subscriber cho các event đã kiểm ở HS-0. Event không đọc được item (bản ghi đã xoá) thì đặt lại toàn bộ.
-- [ ] Job đối soát 15 phút; ghi log số item lệch (bằng chứng cho báo cáo về TR-01).
-- [ ] Script `npx medusa exec ./src/scripts/rebuild-hot-stock.ts`; seed gọi cuối cùng.
-- [ ] Commit `feat(hot-stock): mirror available stock from postgres`.
+- [x] Workflow `sync-hot-stock` nhận `inventory_item_ids` (bỏ trống = toàn bộ) và `removed` (level đã xoá, đặt về 0), đọc inventory level bằng `query.graph`, gọi `syncItems` (pipeline 500 lệnh một lượt, mỗi món vẫn một lần chạy script). **Khác plan:** đồng bộ mọi kho chứ không chỉ Kho Q.7 (key đã có `location_id`, hiện chỉ có một kho), nên module không cần option `locationName`.
+- [x] Subscriber `inventory-level.created/updated/deleted` (tra level theo id, `withDeleted` khi xoá) và `reservation-item.created/updated/deleted` (tra reservation theo id, `withDeleted`) → đặt lại item đó. Không tra được thì đặt lại toàn bộ.
+- [x] Job đối soát 15 phút (`src/jobs/reconcile-hot-stock.ts`); `sync_item` trả cả số cũ nên job ghi log số món lệch và số món thiếu key (bằng chứng cho báo cáo về TR-01).
+- [x] Script `npx medusa exec ./src/scripts/rebuild-hot-stock.ts` (DB dev: 2.129 món, khoảng 11 giây gồm cả khởi động); seed gọi ở cuối, sau đơn demo.
+- [x] Test http (`hot-stock.spec.ts`): seed tự đẩy tồn qua subscriber và dựng lại không lệch; admin sửa tồn trừ phần đang giữ; đặt đơn rồi huỷ đơn; xoá level (đường `withDeleted`); job đối soát sửa key lệch; dựng lại sau khi mất hết key.
+- [x] Commit `feat(hot-stock): mirror available stock from postgres`.
 
 ## Task HS-4: Giữ hàng (API-14)
 
-**Files:** `src/workflows/reserve-cart-stock.ts`, `src/api/store/carts/[id]/reserve/route.ts`, `src/api/middlewares.ts`, `integration-tests/http/hot-stock-reserve.spec.ts`.
+**Files:** `src/workflows/reserve-cart-stock.ts`, `src/api/store/carts/[id]/reserve/route.ts`, `src/lib/inventory/cart-hold-lines.ts` (+ unit test), `integration-tests/http/hot-stock-reserve.spec.ts`. Không cần middleware: body rỗng, route `/store` đã đòi publishable key.
 
 **Xong khi:** các mã trả về của API-14 đúng như mục 3; test http qua route thật với giỏ thật.
 
-- [ ] Workflow: đọc giỏ (`query.graph`, gồm `completed_at`, `items.variant.inventory_items`); gộp các dòng cùng item (repo thử trả `-3` khi trùng); biến thể không quản kho (`manage_inventory = false`) thì bỏ qua; giữ hàng; mã `-1` thì dựng lại item rồi thử lại một lần.
-- [ ] Compensation của bước giữ hàng: `release` khi bước sau trong workflow lỗi.
-- [ ] Route chỉ chạy workflow, đổi lỗi thành 409 có `items` (ánh xạ inventory item về `variant_id`).
-- [ ] Test: đủ hàng; thiếu một món thì không giữ món nào; giỏ đã hoàn tất; gọi 2 lần; đổi số lượng rồi gọi lại; Redis trống thì vẫn giữ được.
-- [ ] Commit `feat(hot-stock): reserve cart stock before payment`.
+- [x] Workflow: đọc giỏ (`query.graph`, gồm `completed_at`, `items.variant.inventory_items`); gộp các dòng cùng item (repo thử trả `-3` khi trùng); biến thể không quản kho (`manage_inventory = false`) thì bỏ qua; giữ hàng; mã `-1` thì dựng lại item rồi thử lại một lần.
+- [x] Compensation của bước giữ hàng: `release` khi bước sau trong workflow lỗi. Hiện bước giữ hàng là bước cuối nên chưa có đường nào kích hoạt; dùng khi HS-6 ghép workflow này vào bước khác. Kho lấy từ `sales_channel.stock_locations` (kho đầu tiên); query không có entity link `sales_channel_stock_location`.
+- [x] Route chỉ chạy workflow. Hết hàng không phải lỗi của workflow (không giữ gì nên không có gì để bù trừ): workflow trả `{ status: "out_of_stock", items }`, route đổi thành 409. `available` của món thiếu đã cộng phần chính giỏ này đang giữ. Một item dùng chung cho nhiều biến thể thì `variant_id` là biến thể đầu tiên.
+- [x] Test: đủ hàng (hạn 15 phút); thiếu một món vì giỏ khác đang giữ, không giữ món nào, giỏ kia trả thì giữ được; hai lần bấm đồng thời; đổi số lượng; hai dòng cùng biến thể được gộp; Redis trống; giỏ đã hoàn tất, giỏ lạ, giỏ trống; 20 giỏ tranh 5 qua HTTP. **Ghi nhận:** Medusa từ chối thêm vào giỏ nhiều hơn tồn Postgres (400), nên giỏ chỉ thiếu trong Redis khi người khác đang giữ; tạo đồng thời nhiều giỏ khách vãng lai **cùng email** thì Medusa lỗi (`Customer ... already exists`, 500).
+- [x] Commit `feat(hot-stock): reserve cart stock before payment`.
 
 ## Task HS-5: Xác nhận và hết hạn
 
-**Files:** `src/subscribers/hot-stock-confirm.ts`, `src/jobs/expire-holds.ts`, test http.
+**Files:** `src/subscribers/hot-stock-confirm.ts`, `src/workflows/confirm-cart-hold.ts`, `src/jobs/expire-holds.ts`, `src/workflows/expire-holds.ts`, `integration-tests/http/hot-stock-lifecycle.spec.ts`.
 
 **Xong khi:** đặt đơn xong thì hold thành `CONFIRMED` và key khớp Postgres; hold quá 15 phút thì `EXPIRED` và hàng trả về; hủy đơn đã xác nhận thì key tăng lại qua HS-3 (không gọi `release`, vì hold đã `CONFIRMED`).
 
-- [ ] Subscriber `order.placed`: tra cart qua `order_cart` (sửa lỗi lấy order id làm cart id của repo thử) → `confirm` → đặt lại các item của đơn.
-- [ ] Job mỗi phút gọi `expireDue` (tối đa 200 hold một lần, như repo thử).
-- [ ] Test: hoàn tất giỏ đã giữ rồi kiểm key; giả lập hết hạn (gọi `expireDue` với `now` tương lai).
-- [ ] Commit `feat(hot-stock): confirm holds on order placed, expire stale holds`.
+- [x] Subscriber `order.placed` → workflow `confirm-cart-hold`: đọc `order.cart.id` (sửa lỗi lấy order id làm cart id của repo thử) → `confirm` → đặt lại các món của đơn bằng `syncHotStockWorkflow.runAsStep`. Đơn không có hold (khách bỏ qua API-14) thì ghi log `not_held`, số vẫn đúng vì đồng bộ theo Postgres.
+- [x] Job mỗi phút (`* * * * *`) chạy workflow `expire-hot-stock-holds` gọi `expireDue` (tối đa 200 hold một lần). Hold không có TTL trong Redis nên hạn thực tế là 15–16 phút.
+- [x] Test: giữ rồi đặt đơn (CONFIRMED, `held` 0, avail không bị trừ hai lần, Postgres `reserved` = 3); huỷ đơn đã xác nhận (hàng về qua reservation bị xoá, hold vẫn CONFIRMED); đặt đơn không giữ trước; hết hạn với `now` +890 giây (chưa trả) và +901 giây (trả, giữ lại được); job theo giờ thật không đụng hold mới và hold đã xác nhận.
+- [x] Commit `feat(hot-stock): confirm holds on order placed, expire stale holds`.
 
 ## Task HS-6: VNPAY
 
-**Files:** `src/modules/vnpay/lib/url.ts`, `src/api/hooks/vnpay/ipn/route.ts`, `src/workflows/guard-paid-cart-stock.ts`, `integration-tests/http/vnpay-ipn.spec.ts`.
+**Files:** `src/modules/vnpay/lib/url.ts`, `src/modules/vnpay/lib/original-payment.ts` (tách từ `service.ts`), `src/api/hooks/vnpay/ipn/route.ts`, `src/workflows/guard-paid-cart-stock.ts`, `src/workflows/release-cart-hold.ts`, `src/workflows/find-stuck-payments.ts`, `src/jobs/reconcile-hot-stock.ts`, `integration-tests/http/hot-stock-ipn.spec.ts`.
 
 **Xong khi:** các ca của API-12 (đổi) có test; test IPN cũ vẫn qua.
 
-- [ ] `EXPIRE_MS` 10 phút (D2); sửa test của `url.ts`.
-- [ ] Bước 5 của IPN (thanh toán không thành công): nhả hold của giỏ, vẫn trả `00`.
-- [ ] Bước 6 (thành công), trước khi phát event: workflow `guard-paid-cart-stock` (D4). Hết hàng thì hoàn tiền bằng `refund-client.ts` theo `vnp_transaction_no`, ghi `cart.metadata.stock_failed`, không phát event. IPN gửi lại thì đọc `stock_failed` và trả `02`.
-- [ ] Test: thất bại thì nhả; thành công khi `HELD`; thành công sau khi hết hạn mà còn hàng; thành công sau khi hết hạn mà hết hàng (mock refund client) thì không có đơn; IPN gửi lặp.
-- [ ] Ghi chú trong `verified-apis.md`: phần hoàn tiền chung trạng thái "chưa kiểm sandbox" với BE-8.
-- [ ] Commit `feat(vnpay): hold-aware IPN and 10 minute payment link`.
+- [x] `EXPIRE_MS` 10 phút (D2); sửa test của `url.ts` và `service.ts`.
+- [x] Bước 5 của IPN (thanh toán không thành công): workflow `release-cart-hold` trả hàng, vẫn trả `00`. Giỏ của phiên tra qua link `cart_payment_collection`.
+- [x] Bước 6a (thành công, phiên chưa có dấu `paid`): workflow `guard-paid-cart-stock` chạy **trước** khi đánh dấu `paid`, có khoá theo giỏ (`hot-stock-ipn-{cart}`). Hold `HELD`/`CONFIRMED` thì đi tiếp; không còn thì chạy `reserveCartStockWorkflow.runAsStep`; hết hàng thì hoàn tiền bằng `requestVnpayRefund` (dữ liệu giao dịch gốc đọc bằng `readOriginalPayment`, tách khỏi provider để dùng chung với BE-8), ghi `cart.metadata.stock_failed { at, items, vnp_transaction_no, refund: "refunded"|"failed", refund_error? }` và trả `00` mà không đánh dấu `paid` (nên `complete` cũng không lấy được đơn). IPN gửi lại khi đã có `stock_failed` thì trả `02`.
+- [x] R2: workflow `find-stuck-payments` (chạy trong job đối soát 15 phút) tìm payment captured, không huỷ, không có refund, payment collection không có đơn, đã thu quá 10 phút; ghi `cart.metadata.payment_stuck { payment_id, amount, captured_at, detected_at }` một lần và log cảnh báo. Lọc `captured_at: { $ne: null }` chạy được với `query.graph`.
+- [x] Test (`hot-stock-ipn.spec.ts`, 7 ca): thất bại thì trả hàng; `HELD` thì tạo đơn, không hoàn; hết hạn mà còn hàng thì giữ lại và tạo đơn; hết hạn và giỏ khác giữ mất thì hoàn tiền, không đơn, hold của giỏ kia nguyên, `complete` không ra đơn, IPN lặp trả `02` và không hoàn lần hai; hai IPN cùng lúc chỉ hoàn một lần; VNPAY từ chối hoàn thì `refund: "failed"`; R2 (giữ 2, admin giảm tồn Postgres còn 1, Medusa hoàn lỗi) được đánh dấu, đơn bình thường không. 11 test IPN cũ vẫn qua (chúng chưa giữ hàng nên đi qua nhánh giữ lại).
+- [x] Ghi chú trong `verified-apis.md` mục HS-6: phần hoàn tiền chung trạng thái "chưa kiểm sandbox" với BE-8.
+- [x] Commit `feat(vnpay): hold-aware IPN and 10 minute payment link`.
 
 ## Task HS-7: Thí nghiệm và tài liệu cho báo cáo
 
-**Files:** `integration-tests/http/hot-stock-h4.spec.ts`, `tools/bench/hot-stock-bench.ts`, `docs/hot-stock.md`.
+**Files:** `integration-tests/http/hot-stock-h4.spec.ts`, `src/scripts/bench-hot-stock.ts` (**khác plan:** script `medusa exec` thay cho `tools/bench/`, để dùng chung ioredis và service của module), `docs/hot-stock-results.md`, `docs/hot-stock.md`.
 
 **Xong khi:** có số đo thật kèm môi trường đo; `docs/hot-stock.md` có dàn ý và sơ đồ. **Phần văn xuôi do hai người làm issue #9 (noper1080, Thiện) tự viết lại** (yêu cầu AI score < 10%).
 
-- [ ] H4 qua HTTP: N = 100 lần gọi API-14 đồng thời, S0 = 5, lặp 20 lần; thêm các kịch bản thanh toán lỗi, gọi lặp, hết hạn hold. Ghi số thành công và `avail` nhỏ nhất.
-- [ ] Đo P95 của `reserve_hold` (gọi trực tiếp và qua HTTP), so với bản GET/DECRBY không nguyên tử của repo thử (số lần bán lố). Ghi máy, số lần lặp, cách tính P95. Đây là số đo được, không phải số mục tiêu của proposal.
-- [ ] Dàn ý `docs/hot-stock.md`: vấn đề, vì sao cần thao tác nguyên tử, các script, vòng đời hold, đồng bộ Postgres, luồng VNPAY (sơ đồ 2.3), các chỗ khác proposal (D5, D9), các tình huống lệch dữ liệu (tiêu chí của issue #9).
-- [ ] Commit `test(hot-stock): H4 concurrency experiment and latency benchmark`.
+- [x] H4 qua HTTP: 100 giỏ gọi API-14 cùng lúc, S0 = 5, 20 lượt → 20/20 lượt đúng 5 giỏ, 95 lần `409 OUT_OF_STOCK`, 0 lỗi khác, tồn thấp nhất 0. Vòng đầy đủ (3 trả tiền, 2 thanh toán lỗi, 2 giỏ khác giữ lại) → 5 đơn, `reserved` = 5. Các kịch bản thanh toán lỗi, gọi lặp, hết hạn đã có test ở HS-2, HS-5, HS-6.
+- [x] P95 (máy i7-13650HX, Redis trong Docker Desktop): Redis giữ hàng 0,75 ms gọi lần lượt, 6,8 ms khi 100 yêu cầu tranh nhau; HTTP API-14 15 ms gọi lần lượt, ~800 ms khi 100 request cùng lúc vào một tiến trình (xếp hàng). GET + DECRBY: 0/20 lượt đúng, bán lố 1.766 món, tồn −95.
+- [x] Dàn ý `docs/hot-stock.md` (ý chính, bảng, sơ đồ; văn xuôi để nhóm issue #9 tự viết).
+- [x] Commit `test(hot-stock): H4 concurrency experiment and latency benchmark`.
 
 ## Task HS-8: Pub/Sub → Socket.io
 
-**Files:** các script Lua (thêm `PUBLISH`), `src/api/store/stock/route.ts`, `apps/realtime-gateway/{package.json,src/index.ts}`, root `package.json` (script `gateway:dev`).
+**Files:** các script Lua (thêm `PUBLISH`), `src/api/store/stock/{route,validators}.ts`, `src/workflows/get-variant-stock.ts`, `src/lib/inventory/variant-stock.ts` (+ unit test), `apps/realtime-gateway/` (`src/rooms.ts`, `src/gateway.ts`, `src/index.ts` + test `node --test`), root `package.json` (`gateway:dev`).
 
 **Xong khi:** mở hai trình duyệt nhỏ (script test socket), một bên giữ hàng thì bên kia nhận `stock:update` với số mới; API-15 trả đúng số trong Redis.
 
-- [ ] Lua `PUBLISH channel:inventory_events` sau mỗi lần `avail` đổi (giữ, nhả, hết hạn, đặt lại). Đặt `stock:variant:*` trong `sync_item`.
-- [ ] API-15 (route chỉ chạy workflow đọc Redis, kiểm `variant_ids` bằng zod).
-- [ ] Gateway: `ioredis` subscriber + `socket.io` server cổng 4001, CORS lấy `STORE_CORS`, room `variant:{id}`, giới hạn 100 id mỗi lần subscribe. Ghim version `socket.io`.
-- [ ] Test: unit cho việc đổi tin nhắn Redis sang room; test tích hợp bằng `socket.io-client`.
-- [ ] Ghi hợp đồng API-15, API-16 cho FE (cài `socket.io-client`, biến `NEXT_PUBLIC_REALTIME_URL`, `LiveStock` nhận số mới).
-- [ ] Commit `feat(realtime): stock updates over socket.io`.
+- [x] Lua `PUBLISH` lên `{prefix}channel:inventory_events` (tên kênh qua ARGV, rỗng = không phát) ngay sau mỗi `DECRBY`/`INCRBY`/`SET` của `stock:avail`: giữ hàng (chỉ món đổi số), trả hàng, `sync_item` (chỉ khi số đổi, để đối soát 15 phút không làm ngập kênh). Tin nhắn `{ location_id, inventory_item_id, available }` mã hoá bằng `cjson`. **Khác plan:** không lưu `stock:variant:*`; FE lấy `inventory_item_id` từ API-15 rồi subscribe theo id đó, nên script không phải đọc thêm key.
+- [x] API-15 `GET /store/stock?variant_ids=`: `validateAndTransformQuery` + zod (1–100 id, bỏ trùng); workflow `get-variant-stock` lọc biến thể theo sales channel của publishable key, kho từ `sales_channel.stock_locations`, món chưa có key thì đặt lại từ Postgres (`syncItemsFromPostgres`, dùng chung với HS-4). Số của biến thể = nhỏ nhất qua các item của floor(avail / required_quantity), không âm; không quản kho thì `null`.
+- [x] Gateway `apps/realtime-gateway` (workspace `@dtc/realtime-gateway`): `ioredis` subscriber + `socket.io` 4.8.1, cổng `REALTIME_PORT` (4001), CORS từ `STORE_CORS`, phòng `stock:{inventory_item_id}`, tối đa 100 id mỗi lần subscribe, ack `{ ok, inventory_item_ids }` hoặc `{ ok: false, error }`. Chạy TypeScript trực tiếp bằng `node --experimental-strip-types` (không bước build); `npm run gateway:dev` từ root.
+- [x] Test: gateway 5 test (`npm test --workspace=@dtc/realtime-gateway`, Redis thật + `socket.io-client`): chỉ nhận món đã subscribe, unsubscribe, payload sai, tin nhắn hỏng. Backend: test module cho tin nhắn của từng script; 3 test http (API-15 trừ phần đang giữ, Redis trống, 400; giữ hàng qua API-14 thì có tin trên kênh); unit `variantStock`.
+- [x] Hợp đồng API-15, API-16 ở bảng API mục 3 của plan `2026-10-18`.
+- [x] Commit `feat(realtime): stock updates over socket.io`.
 
 ## Task HS-9 (tùy chọn): Module Redis của Medusa
+
+**Hoãn (2026-11-04).** Chỉ cần khi chạy từ hai tiến trình Medusa trở lên (tách `server`/`worker`, hoặc nhiều bản sau load balancer). Một tiến trình thì khoá, event và job in-memory vẫn đúng. Khi cần: bật **locking Redis trước** (khoá IPN theo giỏ của HS-6, khoá stage/mã đơn phải có tác dụng giữa các tiến trình), rồi mới tới event bus và workflow engine (hàng đợi trong Redis phải tách theo từng lần chạy test, vì mỗi test tạo DB mới nhưng hàng đợi còn nguyên). Rủi ro R7 trong `docs/known-risks.md`.
 
 - [ ] Bật `@medusajs/medusa/event-bus-redis`, `workflow-engine-redis`, `locking` với provider `locking-redis` (đã có trong `node_modules`, tra docs 2.21.1 trước).
 - [ ] Chạy lại toàn bộ test unit và integration; kiểm subscriber BE-3, BE-6, IPN vẫn chạy (event bus Redis chạy bất đồng bộ qua hàng đợi).
@@ -251,8 +262,8 @@ Những API khác (API-1 đến 13) không đổi. `inventory_quantity` trong St
 
 ## Task HS-10: Tài liệu
 
-- [ ] README: container Redis, biến môi trường, `rebuild-hot-stock`, gateway; nói rõ teammate làm FE cần chạy thêm container Redis.
-- [ ] `.env.template`: bỏ dòng "Not used yet" của `REDIS_URL`, thêm `HOT_STOCK_PREFIX`, `REALTIME_PORT`.
-- [ ] Bảng API mục 3 của plan `2026-10-18`: thêm API-14 đến 16, sửa API-12.
-- [ ] `verified-apis.md` mục HS-x; nhật ký tiến độ ngoài repo.
-- [ ] Commit `docs: hot-stock and realtime setup`.
+- [x] README: container Redis, biến môi trường, `rebuild-hot-stock`, gateway; nói rõ teammate làm FE cần chạy thêm container Redis.
+- [x] `.env.template`: bỏ dòng "Not used yet" của `REDIS_URL`, thêm `HOT_STOCK_PREFIX`, `REALTIME_PORT`.
+- [x] Bảng API mục 3 của plan `2026-10-18`: thêm API-14 đến 16, sửa API-12.
+- [x] `verified-apis.md` mục HS-x; nhật ký tiến độ ngoài repo.
+- [x] Commit `docs: hot-stock and realtime setup`.

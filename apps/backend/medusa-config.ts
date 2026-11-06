@@ -34,5 +34,14 @@ module.exports = defineConfig({
         ],
       },
     },
+    {
+      // Cổng giữ hàng bằng Redis (docs/plans/2026-11-03-redis-hot-stock.md). Không có Redis thì không khởi động.
+      resolve: './src/modules/hot-stock',
+      options: {
+        redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
+        // Test (jest đặt NODE_ENV=test) dùng tiền tố riêng để không xoá nhầm key của DB dev.
+        prefix: process.env.HOT_STOCK_PREFIX || (process.env.NODE_ENV === 'test' ? 'c4f-test:' : 'c4f:'),
+      },
+    },
   ],
 })
