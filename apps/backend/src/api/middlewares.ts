@@ -7,9 +7,8 @@ import {
   validateAndTransformQuery,
 } from '@medusajs/framework/http'
 import { StartDeliveryBody } from './admin/orders/[id]/start-delivery/validators'
-import { AssistantChatBody } from './store/assistant/chat/validators'
 import { SetDeliverySlotBody } from './store/carts/[id]/delivery-slot/validators'
-import { RecipeSearchBody } from './store/recipes/semantic-search/validators'
+import { AiSearchBody } from './store/ai/search/validators'
 import { StockQuery } from './store/stock/validators'
 
 // The product index declares filterable `status` and `sales_channel_ids`, so
@@ -65,16 +64,17 @@ export default defineMiddlewares({
       matcher: '/store/predictive/*',
       middlewares: [authenticate('customer', ['session', 'bearer'])],
     },
-    // Trợ lý Bếp (BE-10): kiểm body theo hợp đồng ngay cả khi route còn là bản giữ chỗ.
+    // Trợ lý Bếp (API-8, hợp đồng AI-0): kiểm body ngay cả khi route còn là bản giữ chỗ. Không bắt đăng nhập:
+    // khách vãng lai cũng tìm món được.
     {
       method: ['POST'],
-      matcher: '/store/recipes/semantic-search',
-      middlewares: [validateAndTransformBody(RecipeSearchBody)],
+      matcher: '/store/ai/search',
+      middlewares: [validateAndTransformBody(AiSearchBody)],
     },
     {
       method: ['POST'],
-      matcher: '/store/assistant/chat',
-      middlewares: [validateAndTransformBody(AssistantChatBody)],
+      matcher: '/store/ai/copilot',
+      middlewares: [validateAndTransformBody(AiSearchBody)],
     },
     // Order retrieve omits `metadata` (the list route has it); needed for metadata.stage.
     // Risk: this route is unauthenticated, anyone holding the order UUID can read it.
