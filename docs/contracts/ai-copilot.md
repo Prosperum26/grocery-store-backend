@@ -8,8 +8,8 @@
 
 | Endpoint | Làm gì | Hiện trạng |
 | :--- | :--- | :--- |
-| `POST /store/ai/search` | Tìm món theo câu hỏi, trả giỏ nguyên liệu dựng sẵn. Nhanh (không dùng mô hình ngôn ngữ) | Giữ chỗ: kiểm body, trả `501 { code: "IN_DEVELOPMENT" }` |
-| `POST /store/ai/copilot` | Như trên, kèm lời AI: giải thích, gợi ý lượng mua, hướng dẫn món phụ. Chậm hơn (vài giây) | Giữ chỗ: như trên |
+| `POST /store/ai/search` | Tìm món theo câu hỏi, trả giỏ nguyên liệu dựng sẵn. Nhanh (không dùng mô hình ngôn ngữ) | Đã nối AI service `/api/v1/search`, gắn `variant` (workflow `ai-recipe-search`) |
+| `POST /store/ai/copilot` | Như trên, kèm lời AI: giải thích, gợi ý lượng mua, hướng dẫn món phụ. Chậm hơn (vài giây) | Đã nối `/api/v1/copilot`; lỗi hay quá giờ thì dùng `/search`, `ai: null`, `ai_status: "fallback_error"` |
 
 - Cần `x-publishable-api-key` như mọi route `/store`. **Không bắt đăng nhập**: khách vãng lai cũng dùng được.
 - Storefront có thể gọi `search` để hiện món ngay, rồi gọi `copilot` để bổ sung lời giải thích (plan AI, quyết định 3).
@@ -90,5 +90,4 @@ Sai ràng buộc: `400` (kiểm ở `middlewares.ts`, test `integration-tests/ht
 | Mã | Khi nào |
 | :--- | :--- |
 | `400` | Body sai ràng buộc, thiếu publishable key |
-| `501 { code: "IN_DEVELOPMENT" }` | Bản giữ chỗ hiện tại (AI chưa nối) |
-| `503 { code: "AI_UNAVAILABLE" }` | (khi nối xong) AI service không trả lời được và không có bản dự phòng. Storefront hiện "Trợ lý Bếp tạm nghỉ" **[cần nhóm AI xác nhận]** |
+| `503 { code: "AI_UNAVAILABLE" }` | AI service không trả lời được và không có bản dự phòng. Storefront hiện "Trợ lý Bếp tạm nghỉ" **[cần nhóm AI xác nhận]** |
