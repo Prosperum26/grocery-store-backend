@@ -8,6 +8,8 @@ import {
 } from '@medusajs/framework/http'
 import { StartDeliveryBody } from './admin/orders/[id]/start-delivery/validators'
 import { SetDeliverySlotBody } from './store/carts/[id]/delivery-slot/validators'
+import { AiAskBody } from './store/ai/ask/validators'
+import { AiRecipeBody } from './store/ai/recipe/validators'
 import { AiSearchBody } from './store/ai/search/validators'
 import { StockQuery } from './store/stock/validators'
 
@@ -75,6 +77,16 @@ export default defineMiddlewares({
       method: ['POST'],
       matcher: '/store/ai/copilot',
       middlewares: [validateAndTransformBody(AiSearchBody)],
+    },
+    {
+      method: ['POST'],
+      matcher: '/store/ai/recipe',
+      middlewares: [validateAndTransformBody(AiRecipeBody)],
+    },
+    {
+      method: ['POST'],
+      matcher: '/store/ai/ask',
+      middlewares: [validateAndTransformBody(AiAskBody)],
     },
     // Order retrieve omits `metadata` (the list route has it); needed for metadata.stage.
     // Risk: this route is unauthenticated, anyone holding the order UUID can read it.

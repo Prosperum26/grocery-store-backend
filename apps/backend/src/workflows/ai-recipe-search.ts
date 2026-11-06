@@ -23,7 +23,7 @@ const askAiServiceStep = createStep("ask-ai-service", async (input: { mode: Mode
 })
 
 // Giá đang tính (gồm khuyến mãi) theo cách giỏ "Mua lại" đã dùng: tiền tệ VND, không cần ngữ cảnh khách.
-const loadVariantRowsStep = createStep("load-ai-variant-rows", async (input: { skus: string[] }, { container }) => {
+export const loadVariantRowsStep = createStep("load-ai-variant-rows", async (input: { skus: string[] }, { container }) => {
   if (!input.skus.length) {
     return new StepResponse<VariantRow[]>([])
   }
