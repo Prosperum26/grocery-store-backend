@@ -1,8 +1,48 @@
-import { buildPredictRequest, orderPlacedAt, PastOrder, usualQuantities } from "../reorder"
+import { buildPredictRequest, estimateDaysLeft, hasReorderHistory, orderPlacedAt, PastOrder, usualQuantities } from "../reorder"
 
 const order = (placed_at: string, lines: [string, number][]): PastOrder => ({
   placed_at,
   lines: lines.map(([variant_id, quantity]) => ({ variant_id, quantity })),
+})
+
+describe("estimateDaysLeft", () => {
+  const history = [
+    order("2026-10-01T00:00:00.000Z", [["often", 1]]),
+    order("2026-10-08T00:00:00.000Z", [["often", 1], ["once", 1]]),
+    order("2026-10-15T00:00:00.000Z", [["often", 1]]),
+  ]
+
+  it("tính từ chu kỳ riêng của món", () => {
+    expect(estimateDaysLeft(history, new Date("2026-10-17T00:00:00.000Z")).get("often")).toBe(5)
+  })
+
+  it("món mua một lần dùng chu kỳ đơn của khách", () => {
+    expect(estimateDaysLeft(history, new Date("2026-10-10T00:00:00.000Z")).get("once")).toBe(5)
+  })
+
+  it("đã qua hạn thì là 0", () => {
+    expect(estimateDaysLeft(history, new Date("2026-11-30T00:00:00.000Z")).get("often")).toBe(0)
+  })
+
+  it("đơn không còn món không làm lệch chu kỳ", () => {
+    const withEmpty = [...history, order("2026-10-03T00:00:00.000Z", [])]
+    expect(estimateDaysLeft(withEmpty, new Date("2026-10-10T00:00:00.000Z")).get("once")).toBe(5)
+  })
+})
+
+describe("hasReorderHistory", () => {
+  const withItems = order("2026-09-19T00:00:00.000Z", [["v1", 1]])
+  const noItems = order("2026-09-20T00:00:00.000Z", [])
+
+  it("cần từ 2 đơn có món trở lên", () => {
+    expect(hasReorderHistory([])).toBe(false)
+    expect(hasReorderHistory([withItems])).toBe(false)
+    expect(hasReorderHistory([withItems, withItems])).toBe(true)
+  })
+
+  it("không tính đơn không còn món", () => {
+    expect(hasReorderHistory([withItems, noItems])).toBe(false)
+  })
 })
 
 describe("orderPlacedAt", () => {
@@ -30,7 +70,7 @@ describe("buildPredictRequest", () => {
       new Map([["egg", "trung-sua"]])
     )
     expect(body).toEqual({
-      top_k: 10,
+      top_k: 14,
       orders: [
         {
           placed_at: "2026-10-03T03:00:00.000Z",
