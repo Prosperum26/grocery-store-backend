@@ -78,7 +78,7 @@ medusaIntegrationTestRunner({
         aiRanking = (ids) => ["variant_gone", milk.id, egg.id, ...ids.filter((id) => id !== milk.id && id !== egg.id)]
         const res = await api.get("/store/predictive/reorder-basket", minhthu)
         expect(aiCalls).toBe(1)
-        expect(aiBody.top_k).toBe(10)
+        expect(aiBody.top_k).toBe(14)
         expect(res.data.status).toBe("ready")
         expect(res.data.items).toHaveLength(5)
         expect(res.data.items[0]).toMatchObject({ variant_id: milk.id, quantity: 2, in_stock: true })
