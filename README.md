@@ -10,7 +10,8 @@ Medusa handles the commerce core (catalog, prices, cart, orders, inventory, auth
 - VNPAY as the only payment provider (signed payment URL, IPN, refunds)
 - Vouchers and a customer voucher wallet
 - Order stages (`PENDING → CONFIRMED → PREPARING → SHIPPING → DELIVERED`, or `CANCELLED`) driven by Medusa events, customer cancel with refund, "start delivery" with driver and ETA
-- "Buy it again" basket (frequency-based placeholder for the LightGBM module) and the kitchen assistant contract (routes return 501 until the AI service is connected)
+- "Buy it again" basket picked by the LightGBM model in `grocery-store-ai` (set `AI_SERVICE_URL`; the block stays hidden while that service is unavailable)
+- Kitchen assistant contract (routes return 501 until the AI service is connected)
 - Admin widgets: summary, low stock, delivery
 
 The storefront lives in a separate repo (`grocery-store-frontend`, port 8000). The API contract both sides follow is section 3 of [`docs/plans/2026-10-18-sync-ui-v2-backend.md`](docs/plans/2026-10-18-sync-ui-v2-backend.md).
@@ -75,6 +76,7 @@ In `apps/backend/.env` set at least:
 | `DATABASE_URL` | `postgres://postgres:<password>@localhost:5434/medusa-backend` |
 | `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET` | Sandbox credentials, or dummy values such as `TESTTMN1` / `test-hash-secret-not-real`. **The backend does not start without them.** |
 | `DEMO_PASSWORD` | Shared password of the demo accounts; leave empty to skip demo data |
+| `AI_SERVICE_URL` | `http://localhost:8001`. Start the model in `grocery-store-ai` with `uvicorn src.main:app --port 8001` |
 
 In `apps/backend/.env.test` set `DB_PORT=5434` and `DB_PASSWORD`; the test runner creates temporary databases on that server. Never commit `.env` or `.env.test`.
 
