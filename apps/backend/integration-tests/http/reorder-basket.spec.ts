@@ -1,3 +1,5 @@
+import { createServer } from "http"
+import type { AddressInfo } from "net"
 import { medusaIntegrationTestRunner } from "@medusajs/test-utils"
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { updateInventoryLevelsWorkflow } from "@medusajs/medusa/core-flows"
@@ -22,8 +24,36 @@ medusaIntegrationTestRunner({
     const graph = async (args: any): Promise<any[]> =>
       (await getContainer().resolve(ContainerRegistrationKeys.QUERY).graph(args)).data as any[]
 
+    // AI service giả: thứ hạng do từng bước của test quyết định.
+    let aiRanking: (ids: string[]) => string[] = (ids) => ids
+    let aiStatus = 200
+    let aiCalls = 0
+    let aiBody: any
+    const aiServer = createServer((req, res) => {
+      let raw = ""
+      req.on("data", (chunk) => (raw += chunk))
+      req.on("end", () => {
+        aiCalls++
+        aiBody = JSON.parse(raw)
+        const ids = [...new Set<string>(aiBody.orders.flatMap((o: any) => o.lines.map((l: any) => l.product_id)))]
+        res.writeHead(aiStatus, { "content-type": "application/json" })
+        res.end(JSON.stringify({ items: aiRanking(ids).map((product_id) => ({ product_id })) }))
+      })
+    })
+
+    beforeAll((done) => {
+      aiServer.listen(0, "127.0.0.1", () => {
+        process.env.AI_SERVICE_URL = `http://127.0.0.1:${(aiServer.address() as AddressInfo).port}`
+        done()
+      })
+    })
+
+    afterAll((done) => {
+      aiServer.close(done)
+    })
+
     describe("GET /store/predictive/reorder-basket", () => {
-      it("gợi ý theo tần suất mua, đánh dấu hết hàng, khách mới thì rỗng", async () => {
+      it("theo thứ hạng của model, đánh dấu hết hàng, khách mới thì rỗng, AI lỗi thì rỗng", async () => {
         const container = getContainer()
         const store = await bootstrapStore(container)
         await seedCatalog(container, store)
@@ -40,14 +70,19 @@ medusaIntegrationTestRunner({
         const variantOf = async (v2Sku: string) =>
           (await graph({ entity: "product_variant", fields: ["id", "inventory_items.inventory_item_id"], filters: { sku: skuOf(v2Sku) } }))[0]
 
-        // 1. Khách có đơn đã giao: 5 món, món mua nhiều lần nhất đứng đầu, số lượng là số hay mua.
-        const res = await api.get("/store/predictive/reorder-basket", minhthu)
-        expect(res.data.status).toBe("ready")
-        expect(res.data.items).toHaveLength(5)
         const egg = await variantOf(EGG)
         const milk = await variantOf(MILK)
-        expect(res.data.items[0]).toMatchObject({ variant_id: egg.id, quantity: 1, in_stock: true })
-        expect(res.data.items[1]).toMatchObject({ variant_id: milk.id, quantity: 2, in_stock: true })
+
+        // 1. Giữ đúng thứ tự của model (sữa trước trứng dù trứng mua nhiều hơn), bỏ món không có
+        // trong DB, số lượng là số hay mua, tối đa 5 món.
+        aiRanking = (ids) => ["variant_gone", milk.id, egg.id, ...ids.filter((id) => id !== milk.id && id !== egg.id)]
+        const res = await api.get("/store/predictive/reorder-basket", minhthu)
+        expect(aiCalls).toBe(1)
+        expect(aiBody.top_k).toBe(10)
+        expect(res.data.status).toBe("ready")
+        expect(res.data.items).toHaveLength(5)
+        expect(res.data.items[0]).toMatchObject({ variant_id: milk.id, quantity: 2, in_stock: true })
+        expect(res.data.items[1]).toMatchObject({ variant_id: egg.id, quantity: 1, in_stock: true })
         for (const item of res.data.items) {
           expect(Object.keys(item).sort()).toEqual(
             ["art", "handle", "in_stock", "product_id", "quantity", "tint", "title", "unit_label", "unit_price", "variant_id"]
@@ -80,9 +115,18 @@ medusaIntegrationTestRunner({
         expect(eggItem.in_stock).toBe(false)
         expect(after.data.total).toBe(sum(after.data.items.filter((i: any) => i.in_stock)))
 
-        // 3. Khách chưa có đơn đã giao.
+        // 3. Khách chưa có đơn đã giao: rỗng, không gọi model.
+        const callsBefore = aiCalls
         const fresh = await api.get("/store/predictive/reorder-basket", await login("khachmoi@com4fud.demo"))
         expect(fresh.data).toEqual({ status: "empty", items: [], total: 0 })
+        expect(aiCalls).toBe(callsBefore)
+
+        // 3b. AI service lỗi: giỏ rỗng, vẫn HTTP 200.
+        aiStatus = 503
+        const down = await api.get("/store/predictive/reorder-basket", minhthu)
+        expect(down.status).toBe(200)
+        expect(down.data).toEqual({ status: "empty", items: [], total: 0 })
+        aiStatus = 200
 
         // 4. warm trả 202 và không chờ.
         const warm = await api.post("/store/predictive/warm", {}, minhthu)

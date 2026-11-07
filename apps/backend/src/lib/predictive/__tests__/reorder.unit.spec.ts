@@ -1,61 +1,76 @@
-import { pickReorderItems, PastOrder } from "../reorder"
+import { buildPredictRequest, orderPlacedAt, PastOrder, usualQuantities } from "../reorder"
 
-const order = (delivered_at: string, lines: [string, number][]): PastOrder => ({
-  delivered_at,
+const order = (placed_at: string, lines: [string, number][]): PastOrder => ({
+  placed_at,
   lines: lines.map(([variant_id, quantity]) => ({ variant_id, quantity })),
 })
 
-describe("pickReorderItems", () => {
-  it("chưa có đơn đã giao thì rỗng", () => {
-    expect(pickReorderItems([])).toEqual([])
+describe("orderPlacedAt", () => {
+  const createdAt = "2026-11-01T00:00:00.000Z"
+
+  it("lấy mốc đầu tiên trong stage_log", () => {
+    const log = [
+      { stage: "PENDING", at: "2026-09-19T11:00:00+07:00" },
+      { stage: "DELIVERED", at: "2026-09-20T11:00:00+07:00" },
+    ]
+    expect(orderPlacedAt(log, createdAt)).toBe("2026-09-19T04:00:00.000Z")
   })
 
-  it("xếp theo số đơn có món, nhiều trước", () => {
-    const picks = pickReorderItems([
-      order("2026-09-19T11:00:00Z", [["egg", 1], ["milk", 2]]),
-      order("2026-09-28T05:00:00Z", [["egg", 1], ["milk", 2], ["banana", 1]]),
-      order("2026-10-03T03:00:00Z", [["egg", 1]]),
-    ])
-    expect(picks.map((p) => [p.variant_id, p.times])).toEqual([["egg", 3], ["milk", 2], ["banana", 1]])
+  it("không có stage_log hoặc mốc sai thì dùng created_at", () => {
+    expect(orderPlacedAt(undefined, createdAt)).toBe(createdAt)
+    expect(orderPlacedAt([], new Date(createdAt))).toBe(createdAt)
+    expect(orderPlacedAt([{ at: "không phải ngày" }], createdAt)).toBe(createdAt)
+  })
+})
+
+describe("buildPredictRequest", () => {
+  it("gửi variant_id làm product_id, kèm danh mục, null khi không có", () => {
+    const body = buildPredictRequest(
+      [order("2026-10-03T03:00:00.000Z", [["egg", 1], ["gone", 2]])],
+      new Map([["egg", "trung-sua"]])
+    )
+    expect(body).toEqual({
+      top_k: 10,
+      orders: [
+        {
+          placed_at: "2026-10-03T03:00:00.000Z",
+          lines: [
+            { product_id: "egg", category: "trung-sua" },
+            { product_id: "gone", category: null },
+          ],
+        },
+      ],
+    })
   })
 
-  it("bằng số lần thì món mua gần đây hơn đứng trước", () => {
-    const picks = pickReorderItems([
-      order("2026-09-19T11:00:00Z", [["old", 1]]),
-      order("2026-10-03T03:00:00Z", [["new", 1]]),
-    ])
-    expect(picks.map((p) => p.variant_id)).toEqual(["new", "old"])
+  it("bỏ đơn không còn dòng nào", () => {
+    const body = buildPredictRequest([order("2026-10-03T03:00:00.000Z", [])], new Map())
+    expect(body.orders).toEqual([])
   })
 
-  it("hoà hoàn toàn thì theo variant_id để kết quả cố định", () => {
-    const picks = pickReorderItems([order("2026-10-03T03:00:00Z", [["b", 1], ["a", 1]])])
-    expect(picks.map((p) => p.variant_id)).toEqual(["a", "b"])
+  it("giữ 500 đơn gần nhất", () => {
+    const orders = Array.from({ length: 501 }, (_, i) =>
+      order(new Date(Date.UTC(2026, 0, 1) + i * 86_400_000).toISOString(), [["a", 1]])
+    )
+    const body = buildPredictRequest(orders, new Map())
+    expect(body.orders).toHaveLength(500)
+    expect(body.orders.map((o) => o.placed_at)).not.toContain(orders[0].placed_at)
   })
+})
 
-  it("lấy tối đa 5 món", () => {
-    const picks = pickReorderItems([
-      order("2026-10-03T03:00:00Z", [["a", 1], ["b", 1], ["c", 1], ["d", 1], ["e", 1], ["f", 1]]),
-    ])
-    expect(picks).toHaveLength(5)
-  })
-
-  it("số lượng gợi ý là số lượng hay mua nhất, hoà thì lấy số lớn hơn", () => {
-    const usual = pickReorderItems([
-      order("2026-09-19T11:00:00Z", [["milk", 2]]),
-      order("2026-09-28T05:00:00Z", [["milk", 2]]),
+describe("usualQuantities", () => {
+  it("số lượng hay mua nhất, hoà thì lấy số lớn hơn", () => {
+    const usual = usualQuantities([
+      order("2026-09-19T11:00:00Z", [["milk", 2], ["rice", 1]]),
+      order("2026-09-28T05:00:00Z", [["milk", 2], ["rice", 3]]),
       order("2026-10-03T03:00:00Z", [["milk", 1]]),
     ])
-    expect(usual[0].quantity).toBe(2)
-
-    const tie = pickReorderItems([
-      order("2026-09-19T11:00:00Z", [["rice", 1]]),
-      order("2026-09-28T05:00:00Z", [["rice", 3]]),
-    ])
-    expect(tie[0].quantity).toBe(3)
+    expect(usual.get("milk")).toBe(2)
+    expect(usual.get("rice")).toBe(3)
   })
 
-  it("cùng món hai dòng trong một đơn: cộng số lượng, tính một lần mua", () => {
-    const picks = pickReorderItems([order("2026-10-03T03:00:00Z", [["egg", 1], ["egg", 2]])])
-    expect(picks).toEqual([{ variant_id: "egg", quantity: 3, times: 1 }])
+  it("cùng món hai dòng trong một đơn thì cộng số lượng", () => {
+    const usual = usualQuantities([order("2026-10-03T03:00:00Z", [["egg", 1], ["egg", 2]])])
+    expect(usual.get("egg")).toBe(3)
   })
 })
