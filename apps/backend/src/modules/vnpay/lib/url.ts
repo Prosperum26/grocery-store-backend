@@ -9,8 +9,9 @@ export type VnpayUrlOptions = {
   ipAddr?: string
 }
 
-// D7: hết hạn thanh toán sau 15 phút; vnp_IpAddr cố định khi chạy sandbox.
-const EXPIRE_MS = 15 * 60 * 1000
+// Hết hạn thanh toán sau 10 phút (hot-stock D2: ngắn hơn hold 15 phút, chừa 5 phút cho IPN tới chậm);
+// vnp_IpAddr cố định khi chạy sandbox.
+const EXPIRE_MS = 10 * 60 * 1000
 const DEFAULT_IP_ADDR = "127.0.0.1"
 
 // Giờ VN = UTC+7. Dịch mốc 7 giờ rồi đọc theo UTC nên không phụ thuộc múi giờ của máy chạy.

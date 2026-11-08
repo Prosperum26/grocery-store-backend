@@ -4,16 +4,25 @@ import {
   configureStoreSearch,
   defineMiddlewares,
   validateAndTransformBody,
+  validateAndTransformQuery,
 } from '@medusajs/framework/http'
 import { StartDeliveryBody } from './admin/orders/[id]/start-delivery/validators'
-import { AssistantChatBody } from './store/assistant/chat/validators'
 import { SetDeliverySlotBody } from './store/carts/[id]/delivery-slot/validators'
-import { RecipeSearchBody } from './store/recipes/semantic-search/validators'
+import { AiAskBody } from './store/ai/ask/validators'
+import { AiRecipeBody } from './store/ai/recipe/validators'
+import { AiSearchBody } from './store/ai/search/validators'
+import { StockQuery } from './store/stock/validators'
 
 // The product index declares filterable `status` and `sales_channel_ids`, so
 // the route narrows it to published products in the key's sales channels.
 export default defineMiddlewares({
   routes: [
+    // Tồn đã trừ phần đang giữ (hot-stock HS-8, API-15): ?variant_ids=a,b, 1–100 id.
+    {
+      method: ['GET'],
+      matcher: '/store/stock',
+      middlewares: [validateAndTransformQuery(StockQuery, {})],
+    },
     // Store API silently drops fields outside a route's `allowed` list.
     // No `method` key: allowFields must run for every method of the matcher.
     // `variants.metadata` already comes back via the default `*variants`; it is
@@ -57,16 +66,27 @@ export default defineMiddlewares({
       matcher: '/store/predictive/*',
       middlewares: [authenticate('customer', ['session', 'bearer'])],
     },
-    // Trợ lý Bếp (BE-10): kiểm body theo hợp đồng ngay cả khi route còn là bản giữ chỗ.
+    // Trợ lý Bếp (API-8, hợp đồng AI-0): kiểm body ngay cả khi route còn là bản giữ chỗ. Không bắt đăng nhập:
+    // khách vãng lai cũng tìm món được.
     {
       method: ['POST'],
-      matcher: '/store/recipes/semantic-search',
-      middlewares: [validateAndTransformBody(RecipeSearchBody)],
+      matcher: '/store/ai/search',
+      middlewares: [validateAndTransformBody(AiSearchBody)],
     },
     {
       method: ['POST'],
-      matcher: '/store/assistant/chat',
-      middlewares: [validateAndTransformBody(AssistantChatBody)],
+      matcher: '/store/ai/copilot',
+      middlewares: [validateAndTransformBody(AiSearchBody)],
+    },
+    {
+      method: ['POST'],
+      matcher: '/store/ai/recipe',
+      middlewares: [validateAndTransformBody(AiRecipeBody)],
+    },
+    {
+      method: ['POST'],
+      matcher: '/store/ai/ask',
+      middlewares: [validateAndTransformBody(AiAskBody)],
     },
     // Order retrieve omits `metadata` (the list route has it); needed for metadata.stage.
     // Risk: this route is unauthenticated, anyone holding the order UUID can read it.
