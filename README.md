@@ -91,6 +91,7 @@ In `apps/backend/.env` set at least:
 | `REDIS_URL` | `redis://localhost:6379` (the default when unset) |
 | `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET` | Sandbox credentials, or dummy values such as `TESTTMN1` / `test-hash-secret-not-real`. **The backend does not start without them.** |
 | `DEMO_PASSWORD` | Shared password of the demo accounts; leave empty to skip demo data |
+| `AI_SERVICE_URL` | `http://localhost:8001`. Start the model in `grocery-store-ai` with `uvicorn src.main:app --port 8001` |
 
 In `apps/backend/.env.test` set `DB_PORT=5434` and `DB_PASSWORD`; the test runner creates temporary databases on that server. Never commit `.env` or `.env.test`.
 
