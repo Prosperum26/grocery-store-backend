@@ -131,6 +131,45 @@ export type StoreAiSearchResponse = AiSearchResponse<StoreBasket>
 export type StoreAiCopilotResponse = AiCopilotResponse<StoreBasket>
 
 // ---------------------------------------------------------------------------------------------------------
+// AI #2 Trợ lý Bếp, màn công thức: POST /api/v1/recipe (không gọi mô hình, nhanh) và POST /api/v1/ask (khách bấm hỏi thêm)
+// Storefront gọi qua POST /store/ai/recipe và POST /store/ai/ask.
+// ---------------------------------------------------------------------------------------------------------
+
+export type AiRecipeRequest = {
+  recipe_id: string // AiRecipeInfo.id
+  servings?: number // 1–50; bỏ trống thì lấy khẩu phần của công thức
+  have?: string[] // như AiSearchRequest.have
+}
+
+export type AiRecipeDetail<Basket = AiBasket> = {
+  recipe: AiRecipeInfo
+  servings: number
+  complete: boolean
+  prep_steps: string[] // các bước chuẩn bị, lấy từ dữ liệu công thức đã thu thập
+  cooking_steps: string[]
+  basket: Basket
+  not_in_basket: string[] // dòng nguyên liệu của công thức mà cửa hàng không bán (raw_text)
+}
+
+export type StoreAiRecipeResponse = AiRecipeDetail<StoreBasket>
+
+export type AiAskRequest = {
+  recipe_id: string
+  question: string // 1–300 ký tự
+  servings?: number
+}
+
+export type AiAskStatus = "ok" | "fallback_disabled" | "fallback_invalid" | "fallback_timeout" | "fallback_error"
+
+export type AiAskResponse = {
+  answer: string | null // null khi mô hình tắt, lỗi hoặc quá giờ: storefront báo "chưa trả lời được"
+  status: AiAskStatus
+  provider: string | null
+  model: string | null
+  latency_ms: number
+}
+
+// ---------------------------------------------------------------------------------------------------------
 // AI #1 Dự đoán mua lại: backend ↔ AI service (POST /api/v1/predict)
 // Theo src/schemas/reorder_dto.py của repo AI (nhánh feature/predictive-reorder, 2026-11-05).
 // Storefront không đổi: vẫn là API-3 (src/workflows/get-reorder-basket.ts, ReorderBasket).
