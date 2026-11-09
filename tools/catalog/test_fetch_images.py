@@ -5,7 +5,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from fetch_images import convert_to_webp, fetch_one, pending
+from fetch_images import convert_to_webp, fetch_one, make_session, pending
 
 
 def make_image(size, mode="RGB", fmt="PNG") -> bytes:
@@ -72,6 +72,14 @@ class PendingTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             (Path(tmp) / "CAT-1.webp.part").write_bytes(b"half")
             self.assertEqual(len(pending(manifest, Path(tmp))), 1)
+
+
+class MakeSessionTest(unittest.TestCase):
+    def test_session_identifies_the_project_instead_of_python_requests(self):
+        # CDN trả 403 cho User-Agent mặc định "python-requests" nhưng nhận một tên dự án rõ ràng.
+        user_agent = make_session().headers["User-Agent"]
+        self.assertIn("Com4Fud", user_agent)
+        self.assertNotIn("python-requests", user_agent)
 
 
 class FetchOneTest(unittest.TestCase):

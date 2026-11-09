@@ -26,6 +26,14 @@ QUALITY = 80
 TIMEOUT = 20  # giây cho mỗi request
 ATTEMPTS = 3
 WORKERS = 4  # số luồng tải song song, để không dồn request vào CDN
+USER_AGENT = "Com4Fud-student-project/1.0 (MSIS4133 coursework)"
+
+
+def make_session() -> requests.Session:
+    """Session tự nhận dạng đúng dự án; CDN trả 403 cho User-Agent mặc định của python-requests."""
+    session = requests.Session()
+    session.headers["User-Agent"] = USER_AGENT
+    return session
 
 
 def convert_to_webp(data: bytes, max_side: int = MAX_SIDE, quality: int = QUALITY) -> bytes:
@@ -88,7 +96,7 @@ def main() -> None:
         todo = todo[: args.limit]
 
     failures: list[tuple[str, str]] = []
-    session = requests.Session()
+    session = make_session()
 
     def work(row: dict) -> None:
         try:
