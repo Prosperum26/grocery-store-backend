@@ -21,6 +21,7 @@ const CATALOG: SeedCatalogData = {
   ),
 }
 const HANDLES = CATALOG.products.slice(0, 3).map((p) => p.handle)
+const NO_URLS = new Map<string, string>()
 
 medusaIntegrationTestRunner({
   inApp: true,
@@ -54,8 +55,8 @@ medusaIntegrationTestRunner({
       }
 
       it("attaches thumbnail and images to products that have a file", async () => {
-        const result = await attachCatalogImages(getContainer(), CATALOG, imagesDir)
-        expect(result).toEqual({ attached: 2, hadThumbnail: 0, missingFile: 1 })
+        const result = await attachCatalogImages(getContainer(), CATALOG, imagesDir, NO_URLS)
+        expect(result).toEqual({ uploaded: 2, linked: 0, hadThumbnail: 0, missing: 1 })
 
         const products = await readProducts()
         for (const handle of HANDLES.slice(0, 2)) {
@@ -67,11 +68,11 @@ medusaIntegrationTestRunner({
       })
 
       it("is idempotent: a second run adds no images", async () => {
-        await attachCatalogImages(getContainer(), CATALOG, imagesDir)
+        await attachCatalogImages(getContainer(), CATALOG, imagesDir, NO_URLS)
         const before = await readProducts()
 
-        const second = await attachCatalogImages(getContainer(), CATALOG, imagesDir)
-        expect(second).toEqual({ attached: 0, hadThumbnail: 2, missingFile: 1 })
+        const second = await attachCatalogImages(getContainer(), CATALOG, imagesDir, NO_URLS)
+        expect(second).toEqual({ uploaded: 0, linked: 0, hadThumbnail: 2, missing: 1 })
 
         const after = await readProducts()
         for (const handle of HANDLES) {
@@ -81,8 +82,8 @@ medusaIntegrationTestRunner({
       })
 
       it("does nothing when the images folder does not exist", async () => {
-        const result = await attachCatalogImages(getContainer(), CATALOG, join(imagesDir, "khong-ton-tai"))
-        expect(result).toEqual({ attached: 0, hadThumbnail: 0, missingFile: 3 })
+        const result = await attachCatalogImages(getContainer(), CATALOG, join(imagesDir, "khong-ton-tai"), NO_URLS)
+        expect(result).toEqual({ uploaded: 0, linked: 0, hadThumbnail: 0, missing: 3 })
       })
 
       it("ignores catalog products that are not in the database", async () => {
@@ -94,8 +95,27 @@ medusaIntegrationTestRunner({
             { ...CATALOG.products[0], handle: "chua-seed", metadata: { ...CATALOG.products[0].metadata, catalog_id: "CAT-T9" } },
           ],
         }
-        const result = await attachCatalogImages(getContainer(), withGhost, imagesDir)
-        expect(result).toEqual({ attached: 2, hadThumbnail: 0, missingFile: 1 })
+        const result = await attachCatalogImages(getContainer(), withGhost, imagesDir, NO_URLS)
+        expect(result).toEqual({ uploaded: 2, linked: 0, hadThumbnail: 0, missing: 1 })
+      })
+
+      it("links the original image URL when there is no local file, preferring the file", async () => {
+        const urls = new Map([
+          ["CAT-T2", "https://cdn.example/t2.jpg"],
+          ["CAT-T3", "https://cdn.example/t3.jpg"],
+        ])
+        const result = await attachCatalogImages(getContainer(), CATALOG, imagesDir, urls)
+        expect(result).toEqual({ uploaded: 2, linked: 1, hadThumbnail: 0, missing: 0 })
+
+        const products = await readProducts()
+        // T2 có cả file lẫn link: dùng file đã upload.
+        expect(products.get(HANDLES[1]).thumbnail).toMatch(/\/static\/.*\.webp$/)
+        // T3 chỉ có link: ghi thẳng link gốc.
+        expect(products.get(HANDLES[2]).thumbnail).toBe("https://cdn.example/t3.jpg")
+        expect(products.get(HANDLES[2]).images.map((i: any) => i.url)).toEqual(["https://cdn.example/t3.jpg"])
+
+        const second = await attachCatalogImages(getContainer(), CATALOG, imagesDir, urls)
+        expect(second).toEqual({ uploaded: 0, linked: 0, hadThumbnail: 3, missing: 0 })
       })
     })
   },

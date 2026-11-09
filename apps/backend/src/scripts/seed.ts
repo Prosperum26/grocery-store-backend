@@ -22,9 +22,9 @@ export default async function seed({ container }: ExecArgs) {
   const catalog = await seedCatalog(container, store, catalogData)
   console.log(`Catalog: created ${catalog.created}, skipped ${catalog.skipped}`)
 
-  // Ảnh sản phẩm (BE-2b): chỉ gắn những ảnh đã tải bằng tools/catalog/fetch_images.py, thiếu thì bỏ qua.
+  // Ảnh sản phẩm (BE-2b): ảnh đã tải bằng tools/catalog/fetch_images.py thì upload, không có file thì dùng link gốc.
   const images = await attachCatalogImages(container, catalogData)
-  console.log(`Images: attached ${images.attached}, already had ${images.hadThumbnail}, missing file ${images.missingFile}`)
+  console.log(`Images: uploaded ${images.uploaded}, linked to original URL ${images.linked}, already had ${images.hadThumbnail}, no image ${images.missing}`)
 
   await seedPromotions(container, store)
   console.log("Promotions: TUOI20, THANHVIEN15, HETHAN5 (nhóm khách 'Thành viên')")
