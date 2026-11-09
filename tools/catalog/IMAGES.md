@@ -1,24 +1,45 @@
 # Ảnh sản phẩm (BE-2b)
 
-Ảnh sản phẩm lấy từ link trong `catalog_v2_updated.xlsx`. Ảnh **không nằm trong git**: mỗi người tự tải về máy, rồi gắn vào Medusa bằng một lệnh seed.
+Ảnh sản phẩm lấy từ link trong `catalog_v2_updated.xlsx`. Danh sách link nằm ở `apps/backend/src/lib/seed/seed-data/image-manifest.json` (1.746 sản phẩm có ảnh, đã commit).
+
+## Hai cách có ảnh
+
+`npm run seed` và `npm run seed:images` gắn ảnh cho từng sản phẩm chưa có `thumbnail` theo thứ tự:
+
+1. **Có file đã tải về** (`seed-data/images/<catalog_id>.webp`): upload qua File Module, ảnh nằm trên backend (`http://localhost:9000/static/...`).
+2. **Không có file**: ghi thẳng link gốc trên CDN của Bách Hoá Xanh vào `thumbnail`.
+3. Không có cả hai (383 sản phẩm không có link): giữ nguyên, storefront hiện ảnh giữ chỗ.
+
+| | Tải ảnh về (cách 1) | Dùng link gốc (cách 2) |
+| :--- | :--- | :--- |
+| Cần làm | chạy `fetch_images.py` trước | không cần gì |
+| Khi deploy | ảnh vỡ (URL `localhost`, thư mục `static/` không theo git) | hiện được ở mọi nơi |
+| Rủi ro | mất `static/` thì mất ảnh | Bách Hoá Xanh đổi, xoá link hoặc chặn hotlink thì ảnh vỡ |
+
+**Deploy:** không chạy `fetch_images.py` trên máy chủ, chỉ chạy `npm run seed` (hoặc `seed:images`) với DB production. Storefront đã cho phép host `cdnv2.tgdd.vn`, `cdn.tgdd.vn` trong `next.config.js`.
+
+Sản phẩm đã có `thumbnail` thì không bị đổi. Muốn chuyển một DB đang dùng ảnh local sang link gốc thì phải xoá `thumbnail` của các sản phẩm đó trước.
 
 ## Chạy
 
-Từ thư mục gốc repo backend (Python 3.11+):
+Từ thư mục gốc repo backend:
+
+```bash
+npm run seed:images --workspace=@dtc/backend      # gắn ảnh (link gốc nếu chưa tải ảnh)
+```
+
+Muốn ảnh nằm trên backend (demo không phụ thuộc CDN), tải ảnh trước (Python 3.11+):
 
 ```bash
 pip install -r tools/catalog/requirements.txt
 python tools/catalog/fetch_images.py --limit 20   # chạy thử 20 ảnh
-python tools/catalog/fetch_images.py              # tải đủ (chạy lại chỉ tải phần còn thiếu)
-npm run seed:images --workspace=@dtc/backend      # upload qua File Module và gắn thumbnail/images
+python tools/catalog/fetch_images.py              # tải đủ, khoảng 51 MB (chạy lại chỉ tải phần còn thiếu)
+npm run seed:images --workspace=@dtc/backend
 ```
 
-Cần backend cấu hình xong (PostgreSQL, Redis, `.env`) và catalog đã được seed (`npm run seed`). `npm run seed` cũng tự gắn ảnh nếu thư mục ảnh đã có file.
-
-- Ảnh lưu ở `apps/backend/src/lib/seed/seed-data/images/<catalog_id>.webp` (WebP, cạnh dài tối đa 800 px).
+- Ảnh lưu ở `apps/backend/src/lib/seed/seed-data/images/<catalog_id>.webp` (WebP, cạnh dài tối đa 800 px, thư mục gitignore).
 - `fetch_images.py` in cuối lượt số ảnh đã có, đã tải và lỗi (kèm mã `catalog_id` lỗi). Chạy lại để thử các ảnh lỗi.
-- Sản phẩm không có ảnh (khoảng 383 dòng không có link) vẫn hiện bình thường với ảnh giữ chỗ.
-- URL ảnh lưu trong DB có dạng `http://localhost:9000/static/...`. Đổi host hoặc cổng backend thì phải gắn lại ảnh.
+- CDN trả 403 cho User-Agent mặc định của `python-requests`, nên script dùng User-Agent riêng của dự án.
 
 ## Cập nhật danh sách ảnh
 
