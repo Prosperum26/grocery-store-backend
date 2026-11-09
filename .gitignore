@@ -55,8 +55,6 @@ yarn-error.log*
 ehthumbs.db
 Thumbs.db
 **/.DS_Store
-# Ảnh sản phẩm tải về bằng tools/catalog/fetch_images.py (mỗi người tự chạy, xem tools/catalog/IMAGES.md)
-apps/backend/src/lib/seed/seed-data/images/
 
 # Python
 __pycache__/
