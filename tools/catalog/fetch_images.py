@@ -19,7 +19,7 @@ from pathlib import Path
 import requests
 from PIL import Image
 
-MANIFEST = Path(__file__).resolve().parent / "image-manifest.json"
+MANIFEST = Path(__file__).resolve().parents[2] / "apps/backend/src/lib/seed/seed-data/image-manifest.json"
 IMAGES_DIR = Path(__file__).resolve().parents[2] / "apps/backend/src/lib/seed/seed-data/images"
 MAX_SIDE = 800
 QUALITY = 80

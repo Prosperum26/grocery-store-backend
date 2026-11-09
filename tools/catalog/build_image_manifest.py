@@ -1,4 +1,4 @@
-"""Sinh tools/catalog/image-manifest.json từ catalog_v2_updated.xlsx.
+"""Sinh apps/backend/src/lib/seed/seed-data/image-manifest.json từ catalog_v2_updated.xlsx.
 
 Chạy một lần (người bảo trì), rồi commit file kết quả để các thành viên khác không cần file xlsx:
     python tools/catalog/build_image_manifest.py <đường dẫn catalog_v2_updated.xlsx>
@@ -13,7 +13,7 @@ from pathlib import Path
 
 import openpyxl
 
-OUT = Path(__file__).resolve().parent / "image-manifest.json"
+OUT = Path(__file__).resolve().parents[2] / "apps/backend/src/lib/seed/seed-data/image-manifest.json"
 
 
 def rows_to_manifest(rows: list[dict]) -> list[dict]:
