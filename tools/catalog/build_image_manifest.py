@@ -42,6 +42,8 @@ def read_rows(xlsx_path: Path) -> list[dict]:
 
 
 def main() -> None:
+    # Console Windows mặc định cp1252 không in được tiếng Việt.
+    sys.stdout.reconfigure(encoding="utf-8")
     if len(sys.argv) != 2:
         sys.exit("Dùng: python tools/catalog/build_image_manifest.py <catalog_v2_updated.xlsx>")
     manifest = rows_to_manifest(read_rows(Path(sys.argv[1])))
