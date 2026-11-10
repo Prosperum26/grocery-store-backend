@@ -117,6 +117,17 @@ medusaIntegrationTestRunner({
         const second = await attachCatalogImages(getContainer(), CATALOG, imagesDir, urls)
         expect(second).toEqual({ uploaded: 0, linked: 0, hadThumbnail: 3, missing: 0 })
       })
+
+      it("uploads an inline data image instead of storing the data URL", async () => {
+        // Ảnh base64 dài hơn giới hạn index của cột image.url trong Postgres, nên phải upload thành file.
+        const urls = new Map([["CAT-T3", `data:image/webp;base64,${WEBP_1X1.toString("base64")}`]])
+        const result = await attachCatalogImages(getContainer(), CATALOG, imagesDir, urls)
+        expect(result).toEqual({ uploaded: 3, linked: 0, hadThumbnail: 0, missing: 0 })
+
+        const t3 = (await readProducts()).get(HANDLES[2])
+        expect(t3.thumbnail).toMatch(/\/static\/.*CAT-T3\.webp$/)
+        expect(t3.images.map((i: any) => i.url)).toEqual([t3.thumbnail])
+      })
     })
   },
 })

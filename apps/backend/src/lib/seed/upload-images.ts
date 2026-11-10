@@ -20,7 +20,8 @@ export function loadImageUrls(): Map<string, string> {
 
 /**
  * Gắn `thumbnail`/`images` cho sản phẩm trong DB. Với mỗi sản phẩm chưa có thumbnail:
- *   - có file <catalog_id>.webp đã tải về → upload qua File Module (ảnh nằm trên backend);
+ *   - có file <catalog_id>.webp đã tải về, hoặc manifest chứa ảnh base64 (data:image/...)
+ *     → upload qua File Module (ảnh nằm trên backend);
  *   - không có file nhưng có link gốc → ghi thẳng link gốc (khi deploy không cần lưu file,
  *     nhưng ảnh phụ thuộc CDN của Bách Hoá Xanh: họ đổi hoặc xoá link thì ảnh vỡ);
  *   - không có cả hai → giữ nguyên, storefront hiện ảnh giữ chỗ.
@@ -46,16 +47,23 @@ export async function attachCatalogImages(
 
   let hadThumbnail = 0
   let missing = 0
-  const toUpload: { id: string; catalogId: string }[] = []
+  // content() trả base64 của ảnh (dạng uploadFilesWorkflow nhận); chỉ đọc file khi tới lô của nó.
+  const toUpload: { id: string; catalogId: string; mimeType: string; content: () => string }[] = []
   const toLink: { id: string; url: string }[] = []
   for (const product of dbProducts as { id: string; handle: string; thumbnail: string | null }[]) {
     const catalogId = catalogIdByHandle.get(product.handle)
     if (!catalogId) continue
     const url = imageUrls.get(catalogId)
+    const file = join(imagesDir, `${catalogId}.webp`)
+    const inline = url ? parseDataImage(url) : null
     if (product.thumbnail) {
       hadThumbnail++
-    } else if (existsSync(join(imagesDir, `${catalogId}.webp`))) {
-      toUpload.push({ id: product.id, catalogId })
+    } else if (existsSync(file)) {
+      toUpload.push({ id: product.id, catalogId, mimeType: "image/webp", content: () => readFileSync(file).toString("base64") })
+    } else if (inline) {
+      // Ảnh base64 dán thẳng trong xlsx: không ghi làm link được (dài hơn giới hạn index của cột
+      // image.url trong Postgres, lỗi 54000), nên upload thành file như ảnh đã tải về.
+      toUpload.push({ id: product.id, catalogId, mimeType: inline.mimeType, content: () => inline.content })
     } else if (url) {
       toLink.push({ id: product.id, url })
     } else {
@@ -68,10 +76,10 @@ export async function attachCatalogImages(
     // Kết quả upload trả về theo đúng thứ tự file đầu vào.
     const { result: uploaded } = await uploadFilesWorkflow(container).run({
       input: {
-        files: batch.map(({ catalogId }) => ({
-          filename: `${catalogId}.webp`,
-          mimeType: "image/webp",
-          content: readFileSync(join(imagesDir, `${catalogId}.webp`)).toString("base64"),
+        files: batch.map(({ catalogId, mimeType, content }) => ({
+          filename: `${catalogId}.${mimeType.split("/")[1]}`,
+          mimeType,
+          content: content(),
           access: "public" as const,
         })),
       },
@@ -84,6 +92,12 @@ export async function attachCatalogImages(
   }
 
   return { uploaded: toUpload.length, linked: toLink.length, hadThumbnail, missing }
+}
+
+/** "data:image/webp;base64,AAAA" → { mimeType: "image/webp", content: "AAAA" }; link thường → null. */
+function parseDataImage(url: string): { mimeType: string; content: string } | null {
+  const match = /^data:(image\/[a-z+]+);base64,(.+)$/s.exec(url)
+  return match ? { mimeType: match[1], content: match[2] } : null
 }
 
 async function setImages(container: MedusaContainer, items: { id: string; url: string }[]) {
