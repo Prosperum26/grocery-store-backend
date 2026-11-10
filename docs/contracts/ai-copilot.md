@@ -15,7 +15,7 @@
 | `POST /store/ai/ask` | Khách bấm "hỏi thêm" về món đang xem (dinh dưỡng, bớt gì cho hợp khẩu vị...). Chỉ gọi khi khách bấm nút. Chậm (vài giây) | Nối `/api/v1/ask` (workflow `ai-recipe-ask`) |
 
 - `recipe`: body `{ recipe_id, servings? (1–50), have? }` (`id` lấy từ `results[].recipe.id`), trả `StoreAiRecipeResponse` = `{ recipe, servings, complete, prep_steps[], cooking_steps[], basket (có variant), ingredient_lines[], not_in_basket[] }`. `ingredient_lines` là nguyên liệu đúng như công thức ghi (mỗi dòng một lần). Trong `basket` mỗi sản phẩm chỉ có một dòng; `ingredient` là tên để hiển thị, `ingredients[]` là từng nguyên liệu sản phẩm đó phục vụ. Không có món: `404 { code: "AI_RECIPE_NOT_FOUND" }`.
-- `ask`: body `{ recipe_id, question (1–300), servings? }`, trả `{ answer, status, provider, model, latency_ms }`. Mô hình tắt, lỗi hay quá giờ thì vẫn `200` với `answer: null` và `status` là `fallback_*` (storefront hiện "Chưa trả lời được, bạn thử lại"). Không có món: `404`. Câu trả lời là văn bản thường, số dinh dưỡng chỉ là ước tính.
+- `ask`: body `{ recipe_id, question (1–300), servings?, history? (tối đa 6 lượt `{ question, answer }` trước đó, để hỏi nối tiếp) }`, trả `{ answer, status, provider, model, latency_ms }`. Mô hình tắt, lỗi hay quá giờ thì vẫn `200` với `answer: null` và `status` là `fallback_*` (storefront hiện "Chưa trả lời được, bạn thử lại"). Không có món: `404`. Câu trả lời là văn bản thường, số dinh dưỡng chỉ là ước tính.
 
 - Cần `x-publishable-api-key` như mọi route `/store`. **Không bắt đăng nhập**: khách vãng lai cũng dùng được.
 - Storefront có thể gọi `search` để hiện món ngay, rồi gọi `copilot` để bổ sung lời giải thích (plan AI, quyết định 3).

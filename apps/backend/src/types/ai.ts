@@ -160,6 +160,7 @@ export type AiAskRequest = {
   recipe_id: string
   question: string // 1–300 ký tự
   servings?: number
+  history?: { question: string; answer: string }[] // tối đa 6 lượt trước, cũ trước mới sau, để hỏi nối tiếp
 }
 
 export type AiAskStatus = "ok" | "fallback_disabled" | "fallback_invalid" | "fallback_timeout" | "fallback_error"
