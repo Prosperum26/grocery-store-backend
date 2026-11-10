@@ -160,3 +160,81 @@
 | CAT-002117 | Đậu rồng 250g | Bách Hoá Xanh | Đậu rồng |
 | CAT-002119 | Đậu đỏ gói 200g | Bách Hoá Xanh | Đậu đỏ 150g |
 | CAT-002120 | Đậu đỏ khô gói 200g | Bách Hoá Xanh | Đậu đỏ 150g |
+
+## Đợt 2: ảnh nhóm tự tìm (ô xanh trong xlsx, kèm CAT-001803 dùng chung ảnh với CAT-001802)
+
+Ảnh Bing là ảnh thu nhỏ do Bing lưu, không rõ trang gốc và giấy phép. Ảnh từ các trang bán hàng khác cũng không có giấy phép mở. Tất cả chỉ dùng cho đồ án môn học.
+
+| catalog_id | Sản phẩm | Nguồn |
+| :--- | :--- | :--- |
+| CAT-001784 | Bánh quẩy gói 150g | bizweb.dktcdn.net |
+| CAT-001790 | Thịt chay lát (gà/bò) gói 200g | media.tripmap.vn |
+| CAT-001794 | Hoa kim châm khô 50g | thaphaco.com.vn |
+| CAT-001795 | Bông so đũa 100g | thumbor.asia-southeast1.aeon-vn-prod.e.spresso.com |
+| CAT-001799 | Bạc hà (dọc mùng) 300g | product.hstatic.net |
+| CAT-001800 | Bạch quả lọ 100g | Bách Hoá Xanh |
+| CAT-001803 | Bắp chuối xanh 300g | Co.op Online |
+| CAT-001805 | Bồn bồn tươi bó 200g | thucphamdongxanh.com |
+| CAT-001806 | Bồn bồn ngâm chua 300g | lahotel.vn |
+| CAT-001809 | Bột cumin lọ 50g | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
+| CAT-001810 | Bột dashi cá hộp 50g | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
+| CAT-001811 | Bột hành lọ 50g | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
+| CAT-001814 | Trái bụt giấm 200g | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
+| CAT-001825 | Chả quết heo khay 200g | Bách Hoá Xanh |
+| CAT-001828 | Cua gạch 500g | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
+| CAT-001829 | Thịt cua đông lạnh gói 200g | Bách Hoá Xanh |
+| CAT-001831 | Cà na muối 200g | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
+| CAT-001834 | Cà ri đỏ gói 50g | Bách Hoá Xanh |
+| CAT-001836 | Cá bống mú 800g | haisantrungnam.vn |
+| CAT-001838 | Cá bớp 500g | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
+| CAT-001843 | Cá chẽm phi lê khay 300g | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
+| CAT-001845 | Cá cờ 500g | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
+| CAT-001848 | Cá hanh 800g | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
+| CAT-001852 | Cá khoai 500g | ảnh nhúng trong xlsx (data:image), không rõ nguồn |
+| CAT-001854 | Cá lòng tong 300g | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
+| CAT-001856 | Cá ngát 500g | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
+| CAT-001857 | Cá ngừ khô bào gói 50g | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
+| CAT-001858 | Cá nâu 500g | ảnh nhúng trong xlsx (data:image), không rõ nguồn |
+| CAT-001863 | Cá tầm phi lê khay 300g | ảnh nhúng trong xlsx (data:image), không rõ nguồn |
+| CAT-001869 | Gấc 1 trái | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
+| CAT-001870 | Cơm mẻ hũ 200g | atuankhang.vn |
+| CAT-001874 | Cải rổ 300g | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
+| CAT-001875 | Cải xoong 200g | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
+| CAT-001878 | Cọng súng bó 200g | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
+| CAT-001879 | Cốm dẹp gói 200g | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
+| CAT-001881 | Củ hũ dừa 200g | Bách Hoá Xanh |
+| CAT-001882 | Củ kiệu chua hũ 300g | Bách Hoá Xanh |
+| CAT-001883 | Củ mài 300g | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
+| CAT-001884 | Củ nén 100g | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
+| CAT-001885 | Củ năng 200g | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
+| CAT-001886 | Củ cải đỏ radish 200g | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
+| CAT-001887 | Củ sâm đất 200g | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
+| CAT-001888 | Củ từ 300g | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
+| CAT-001889 | Da bò bía tươi gói 200g | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
+| CAT-001893 | Củ kiệu ngâm chua hũ 300g | Bách Hoá Xanh |
+| CAT-001894 | Nụ bạch hoa (capers) hũ 100g | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
+| CAT-001895 | Dầu ô liu chai 250ml | Bách Hoá Xanh |
+| CAT-001896 | Dẻ sụn heo 300g | Bách Hoá Xanh |
+| CAT-001897 | Dọc mùng 300g | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
+| CAT-001898 | Dồi trường 300g | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
+| CAT-001899 | Dừa nạo sợi 100g | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
+| CAT-001900 | Dừa sấy gói 100g | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
+| CAT-001905 | Gà quay nguyên con 1kg | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
+| CAT-001908 | Gân bò khay 300g | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
+| CAT-001910 | Gạo thường 1kg | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
+| CAT-001911 | Ham chay 200g | thucphamchaydieuthien.com |
+| CAT-001913 | Heo quay 300g | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
+| CAT-001914 | Hoa bí bó 200g | Bách Hoá Xanh |
+| CAT-001915 | Hoa súng gói 200g | thucphamsachgiatot.vn |
+| CAT-001916 | Hoa tiêu Tứ Xuyên 50g | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
+| CAT-001917 | Vỏ hoành thánh gói 200g | ảnh nhúng trong xlsx (data:image), không rõ nguồn |
+| CAT-001918 | Huyết heo 200g | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
+| CAT-001920 | Húng lủi 50g | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
+| CAT-001921 | Hạnh nhân lát gói 100g | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
+| CAT-001923 | Hạt dổi gói 20g | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
+| CAT-001924 | Hạt mắc khén 20g | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
+| CAT-001925 | Hạt ngò gói 30g | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
+| CAT-001926 | Hạt thông gói 100g | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
+| CAT-001930 | Cà ri xanh Thái gói 50g | Bách Hoá Xanh |
+| CAT-001931 | Giăm bông gói 200g | Bách Hoá Xanh |
+| CAT-001934 | Khoai tây tím 500g | Bing Hình ảnh (ảnh thu nhỏ, không rõ trang gốc) |
