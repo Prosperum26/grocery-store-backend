@@ -5,7 +5,7 @@
 - 1.746 ảnh Bách Hoá Xanh có sẵn trong xlsx (`CAT-000001` đến `CAT-001775`, có `product_url`).
 - 226 ảnh bổ sung cho sản phẩm thêm tay (`CAT-001776` trở đi), nhóm tìm và duyệt tay:
   - Đợt 1 (155 ảnh): Co.op Online, Bách Hoá Xanh và Wikimedia Commons.
-  - Đợt 2 (71 ảnh): Bing Hình ảnh, Bách Hoá Xanh và vài trang bán hàng khác. Có 4 ảnh dán thẳng vào xlsx dạng base64 (`data:image/webp;base64,...`), lưu nguyên trong manifest và trong `thumbnail`.
+  - Đợt 2 (71 ảnh): Bing Hình ảnh, Bách Hoá Xanh và vài trang bán hàng khác. Có 4 ảnh dán thẳng vào xlsx dạng base64 (`data:image/webp;base64,...`), giữ nguyên trong manifest. Khi seed, 4 ảnh này luôn được upload qua File Module (`/static/...`), vì chuỗi base64 dài hơn giới hạn index của cột `image.url` trong Postgres. Lúc deploy, thư mục `static/` của backend phải được giữ lại thì 4 ảnh này mới hiện.
   - Nguồn từng ảnh: `ATTRIBUTION-extra-images.md` (ảnh Wikimedia CC BY-SA phải ghi tác giả).
 - `build_image_manifest.py` chuẩn hoá link khi đọc xlsx: link proxy `img.bhxwork.vn` đổi về link CDN Bách Hoá Xanh gốc, link ảnh Bing bỏ tham số kích thước để lấy ảnh lớn hơn.
 
