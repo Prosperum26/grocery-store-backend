@@ -19,6 +19,7 @@ export type AiSearchRequest = {
   servings?: number // 1–50; bỏ trống thì AI đọc từ câu hỏi
   top_k?: number // 1–10, mặc định 5
   have?: string[] // tên nguyên liệu hoặc catalog_id khách đã có
+  include_basket?: boolean // false: chỉ cần danh sách món (màn tìm kiếm), giỏ trả về rỗng. Mặc định true
 }
 
 export type AiNeed = { quantity: number; unit: string | null; scaled_for: number }
@@ -34,7 +35,8 @@ export type AiProduct = {
 export type AiAlternative = { catalog_id: string; name: string }
 
 export type AiBasketItem = {
-  ingredient: string
+  ingredient: string // tên hiển thị; nhiều nguyên liệu chung một sản phẩm thì nối bằng ", "
+  ingredients?: string[] // từng nguyên liệu mà sản phẩm này phục vụ (thường chỉ một). Mỗi sản phẩm chỉ có một dòng trong giỏ
   kind: "core" | "addon"
   raw_text: string // dòng nguyên liệu gốc của công thức
   need: AiNeed | null // null khi công thức không ghi lượng
@@ -148,7 +150,8 @@ export type AiRecipeDetail<Basket = AiBasket> = {
   prep_steps: string[] // các bước chuẩn bị, lấy từ dữ liệu công thức đã thu thập
   cooking_steps: string[]
   basket: Basket
-  not_in_basket: string[] // dòng nguyên liệu của công thức mà cửa hàng không bán (raw_text)
+  ingredient_lines?: string[] // nguyên liệu đúng như công thức ghi, mỗi dòng một lần
+  not_in_basket: string[] // phần không vào giỏ (đồ ăn kèm, không phải hàng mua): chữ công thức hoặc tên nguyên liệu
 }
 
 export type StoreAiRecipeResponse = AiRecipeDetail<StoreBasket>
