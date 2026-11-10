@@ -8,25 +8,46 @@ File kết quả là danh sách {catalog_id, image_url, product_url} của các 
 """
 
 import json
+import re
 import sys
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import openpyxl
 
 OUT = Path(__file__).resolve().parents[2] / "apps/backend/src/lib/seed/seed-data/image-manifest.json"
 
 
+# Proxy ảnh của trang Bách Hoá Xanh bọc link CDN gốc: .../imgt/bhx/<tham số>/<link gốc>
+BHX_PROXY = re.compile(r"^https://img\.bhxwork\.vn/imgt/bhx/[^/]+/(https://.+)$")
+
+
+def normalize_image_url(url: str) -> str:
+    """Đưa link ảnh nhóm dán vào xlsx về dạng ổn định hơn.
+
+    - Proxy img.bhxwork.vn: lấy link CDN gốc bên trong (host cdn.tgdd.vn / cdnv2.tgdd.vn storefront đã cho phép).
+    - Ảnh thu nhỏ của Bing (th.bing.com): bỏ tham số w/h... thì Bing trả ảnh lớn hơn (khoảng 474 px thay vì ~180 px).
+    """
+    url = url.strip()
+    proxied = BHX_PROXY.match(url)
+    if proxied:
+        return proxied.group(1)
+    if urlsplit(url).hostname == "th.bing.com":
+        return url.split("?", 1)[0]
+    return url
+
+
 def rows_to_manifest(rows: list[dict]) -> list[dict]:
-    """Giữ các dòng có image_url bắt đầu bằng http, theo đúng thứ tự trong xlsx."""
+    """Giữ các dòng có link ảnh http(s) hoặc ảnh nhúng data:image/..., theo đúng thứ tự trong xlsx."""
     manifest = []
     for row in rows:
-        image_url = row.get("image_url")
-        if not image_url or not str(image_url).startswith("http"):
+        image_url = str(row.get("image_url") or "").strip()
+        if not image_url.startswith(("http", "data:image/")):
             continue
         manifest.append(
             {
                 "catalog_id": row["catalog_id"],
-                "image_url": str(image_url),
+                "image_url": normalize_image_url(image_url),
                 "product_url": row.get("product_url") or None,
             }
         )

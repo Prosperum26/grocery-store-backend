@@ -9,6 +9,7 @@ Chạy (Python 3.11+, cần requests và Pillow: pip install -r tools/catalog/re
 """
 
 import argparse
+import base64
 import io
 import json
 import sys
@@ -70,11 +71,17 @@ def _get(session, url: str):
 
 def fetch_one(session, row: dict, out_dir: Path) -> None:
     """Tải một ảnh. Chỉ khi chuyển đổi thành công mới ghi file, nên không bao giờ để lại .webp dở dang."""
-    response = _get(session, row["image_url"])
-    content_type = response.headers.get("Content-Type", "")
-    if not content_type.startswith("image/"):
-        raise ValueError(f"không phải ảnh (Content-Type: {content_type or 'trống'})")
-    webp = convert_to_webp(response.content)
+    url = row["image_url"]
+    if url.startswith("data:image/"):
+        # Ảnh nhúng thẳng trong xlsx (data:image/webp;base64,...): giải mã, không cần gọi mạng.
+        data = base64.b64decode(url.split(",", 1)[1])
+    else:
+        response = _get(session, url)
+        content_type = response.headers.get("Content-Type", "")
+        if not content_type.startswith("image/"):
+            raise ValueError(f"không phải ảnh (Content-Type: {content_type or 'trống'})")
+        data = response.content
+    webp = convert_to_webp(data)
     target = out_dir / f"{row['catalog_id']}.webp"
     part = target.with_name(target.name + ".part")
     part.write_bytes(webp)

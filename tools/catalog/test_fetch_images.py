@@ -1,3 +1,4 @@
+import base64
 import io
 import tempfile
 import unittest
@@ -105,6 +106,17 @@ class FetchOneTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 fetch_one(session, self.row, Path(tmp))
             self.assertEqual(list(Path(tmp).iterdir()), [])
+
+    def test_fetch_one_decodes_inline_data_image_without_network(self):
+        data_url = "data:image/png;base64," + base64.b64encode(make_image((300, 200))).decode()
+
+        class NoNetwork:
+            def get(self, url, timeout):
+                raise AssertionError("không được gọi mạng với ảnh data:")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            fetch_one(NoNetwork(), {"catalog_id": "CAT-2", "image_url": data_url}, Path(tmp))
+            self.assertEqual(open_webp((Path(tmp) / "CAT-2.webp").read_bytes()).size, (300, 200))
 
 
 if __name__ == "__main__":
