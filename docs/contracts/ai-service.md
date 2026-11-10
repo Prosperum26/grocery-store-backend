@@ -21,16 +21,18 @@
 
 | Mục | Giá trị | Lý do |
 | :--- | :--- | :--- |
-| Cổng AI service | **8100**: `uvicorn src.main:app --port 8100` | `uvicorn` mặc định 8000, trùng storefront (proposal ghi 8100) |
+| Cổng AI service | **8100**: `uvicorn src.main:app --port 8100` (một tiến trình chạy cả hai module) | `uvicorn` mặc định 8000, trùng storefront (proposal ghi 8100) |
+| Chạy tách hai tiến trình | Trợ lý Bếp `uvicorn src.apps.chef:app --port 8100`, Mua lại `uvicorn src.apps.reorder:app --port 8101` | Một bên sập, treo hay hết RAM không kéo bên kia theo. Mua lại không cần torch hay `ai_db` nên lên trong vài giây. Backend đặt thêm `AI_REORDER_URL` |
 | Cổng `ai_db` (Postgres + pgvector của AI) | **5435**: đặt `AI_DB_PORT=5435` trong `.env` của repo AI | Mặc định 5434 trùng `com4fud-postgres` của backend; compose của AI đã đọc biến này |
 | File model "Mua lại" | `weights/lgbm_v4_selected.onnx` | **Không có trong git** (quy định không commit artifact). Xin Irvine hoặc chạy lại pipeline của repo AI (cần dữ liệu Instacart). Thiếu file thì `/predict` trả `503` |
 | Khóa Gemini/Claude/OpenRouter | `.env` của repo AI | Không bao giờ ở backend |
 
-Biến môi trường của backend (`apps/backend/.env.template`, chưa có code đọc):
+Biến môi trường của backend (`apps/backend/.env.template`):
 
 | Biến | Mặc định | Dùng cho |
 | :--- | :--- | :--- |
 | `AI_SERVICE_URL` | `http://localhost:8100` | Gốc của mọi endpoint dưới đây |
+| `AI_REORDER_URL` | (trống) | Gốc riêng của `/api/v1/predict` khi Mua lại chạy thành tiến trình riêng (`http://localhost:8101`). Trống thì dùng `AI_SERVICE_URL` |
 | `AI_INTERNAL_KEY` | (trống) | Gửi trong header `X-Internal-Key`; cùng giá trị ở `.env` của AI service. Không commit khóa thật |
 | `AI_PREDICT_TIMEOUT_MS` | `500` | `/api/v1/predict` (proposal: quá 500 ms thì ẩn hoặc dùng bản tạm) |
 | `AI_SEARCH_TIMEOUT_MS` | `3000` | `/api/v1/search` (plan AI: p95 mục tiêu < 1 giây) |
@@ -39,7 +41,8 @@ Biến môi trường của backend (`apps/backend/.env.template`, chưa có cod
 ## 3. Quy ước chung
 
 - **Tiền tố `/api/v1`** cho mọi endpoint nghiệp vụ, như `/api/v1/predict` đang chạy (`api_router` của repo AI). Plan Trợ lý Bếp ghi `/v1/search`, `/v1/copilot`: đề xuất đổi thành `/api/v1/search`, `/api/v1/copilot` cho cùng một router **[cần nhóm AI xác nhận]**. Health: `GET /api/v1/health`.
-- **Xác thực:** mọi endpoint trừ health cần header `X-Internal-Key: <AI_INTERNAL_KEY>` (plan AI mục 3). `/api/v1/predict` hiện chưa kiểm khóa **[cần nhóm AI thêm]**. Sai hoặc thiếu khóa: `401`.
+- **Xác thực:** mọi endpoint trừ health cần header `X-Internal-Key: <AI_INTERNAL_KEY>` (plan AI mục 3). `/api/v1/predict` cũng kiểm khóa; backend gửi khóa ở `src/lib/predictive/ai-client.ts`. Sai hoặc thiếu khóa: `401`; AI service chưa đặt khóa: `503`.
+- **Health:** `GET /api/v1/health` trả `{ status, modules, ai_providers, reorder_model_loaded }`. `modules` ghi module mà tiến trình đó chạy (`chef`, `reorder`) là `"ok"` hay `"failed"`; `status` là `"degraded"` khi có module nạp lỗi. Module nạp lỗi thì route của nó trả `503`, module kia vẫn chạy.
 - **Định danh sản phẩm: `catalog_id`** (`CAT-000001`…`CAT-002129`). Trong Medusa, `catalog_id` = **`sku` của biến thể** (BE-2), mỗi sản phẩm một biến thể. Backend đổi `catalog_id` ↔ biến thể bằng `product_variant` lọc theo `sku`.
 - **Danh mục:** handle của 11 danh mục cha (`rau-cu`, `trai-cay`, `thit`, `hai-san`, `trung-sua`, `gao-do-kho`, `gia-vi`, `do-uong`, `mi-an-lien`, `banh-keo-an-vat`, `dong-lanh-che-bien`); khớp đúng khóa trong `src/ml/category_map.json` của AI.
 - **Ngày giờ:** ISO 8601 có múi giờ (`2026-11-06T09:00:00+07:00`).
@@ -76,13 +79,15 @@ Backend dựng API-3 từ `items`: đổi `product_id` → biến thể, giá đ
 
 Theo plan AI mục 3, giữ nguyên:
 
-- Request (`AiSearchRequest`): `{ query (1–300), servings? (1–50), top_k? (1–10, mặc định 5), have? (tên nguyên liệu hoặc catalog_id) }`.
+- Request (`AiSearchRequest`): `{ query (1–300), servings? (1–50), top_k? (1–10, mặc định 5), have? (tên nguyên liệu hoặc catalog_id), include_basket? (mặc định true) }`. `include_basket: false` trả danh sách món với giỏ rỗng, dùng cho màn tìm kiếm.
+- Tìm theo tên: khách gõ có dấu thì so từng từ có dấu ("cơm" không khớp "cốm"); gõ không dấu thì hai bên cùng bỏ dấu.
+- Giỏ: **mỗi sản phẩm chỉ có một dòng**. Nhiều nguyên liệu cùng ghép vào một sản phẩm thì gộp: `ingredient` nối bằng ", ", `ingredients[]` liệt kê từng nguyên liệu.
 - `/api/v1/search` → `AiSearchResponse`: `query`, `servings`, `accepted`, `threshold`, `results[]` (`recipe`, `score`, `matched_by`, `complete`, `basket: { buy, maybe_have }`), mỗi dòng giỏ có `product.catalog_id`, `default_qty`, `pack_hint`, `alternatives[]`.
 - `/api/v1/copilot` → `AiCopilotResponse`: `{ data: <như search>, ai: <lời AI> | null, ai_status, latency_ms }`. `data` luôn có.
 
 Backend (`/store/ai/search`, `/store/ai/copilot`) chuyển tiếp body, rồi **gắn phần bán hàng** vào từng `product` và `alternatives[]` theo hợp đồng storefront ([`ai-copilot.md`](ai-copilot.md)): `variant_id`, giá đang tính, tồn đã trừ phần khách khác đang giữ (như API-15), `purchasable`.
 
-**Màn công thức:** `POST /api/v1/recipe` (`{ recipe_id, servings?, have? }` → `recipe`, `servings`, `complete`, `prep_steps`, `cooking_steps`, `basket`, `not_in_basket`; 404 nếu không có món) và `POST /api/v1/ask` (`{ recipe_id, question (1–300), servings? }` → `{ answer | null, status, provider, model, latency_ms }`; mô hình lỗi vẫn 200 với `answer: null`; 404 nếu không có món). Backend gắn `variant` vào `basket` của `/recipe` và chuyển nguyên `/ask`. Mọi route `/api/v1/*` (trừ `/health`) cần header `X-Internal-Key`. Quá giờ mặc định: `AI_RECIPE_TIMEOUT_MS` 3000, `AI_ASK_TIMEOUT_MS` 35000.
+**Màn công thức:** `POST /api/v1/recipe` (`{ recipe_id, servings?, have? }` → `recipe`, `servings`, `complete`, `prep_steps`, `cooking_steps`, `basket`, `ingredient_lines` (nguyên liệu đúng như công thức ghi, mỗi dòng một lần), `not_in_basket`; 404 nếu không có món) và `POST /api/v1/ask` (`{ recipe_id, question (1–300), servings? }` → `{ answer | null, status, provider, model, latency_ms }`; mô hình lỗi vẫn 200 với `answer: null`; 404 nếu không có món). Backend gắn `variant` vào `basket` của `/recipe` và chuyển nguyên `/ask`. Mọi route `/api/v1/*` (trừ `/health`) cần header `X-Internal-Key`. Quá giờ mặc định: `AI_RECIPE_TIMEOUT_MS` 3000, `AI_ASK_TIMEOUT_MS` 35000.
 
 **Dự phòng:** `/store/ai/copilot` quá giờ hoặc lỗi → gọi `/api/v1/search` và trả `{ data, ai: null, ai_status: "fallback_error" }` nếu kịp; cả hai lỗi → `503 { code: "AI_UNAVAILABLE" }` để storefront hiện "Trợ lý Bếp tạm nghỉ, bạn thử lại sau". **[cần nhóm AI xác nhận]**
 
