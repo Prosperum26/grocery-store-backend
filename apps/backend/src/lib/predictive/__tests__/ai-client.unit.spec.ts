@@ -4,6 +4,8 @@ const body = { top_k: 10, orders: [] };
 const logger = { warn: jest.fn() };
 const realFetch = global.fetch;
 const realUrl = process.env.AI_SERVICE_URL;
+const realReorderUrl = process.env.AI_REORDER_URL;
+const realKey = process.env.AI_INTERNAL_KEY;
 
 const respond = (status: number, json: unknown) =>
   jest
@@ -13,12 +15,27 @@ const respond = (status: number, json: unknown) =>
 describe("fetchReorderRanking", () => {
   beforeEach(() => {
     process.env.AI_SERVICE_URL = "http://ai.test/";
+    delete process.env.AI_REORDER_URL;
+    process.env.AI_INTERNAL_KEY = "secret-key";
     logger.warn.mockClear();
   });
 
   afterAll(() => {
     global.fetch = realFetch;
     process.env.AI_SERVICE_URL = realUrl;
+    process.env.AI_REORDER_URL = realReorderUrl;
+    process.env.AI_INTERNAL_KEY = realKey;
+  });
+
+  it("gửi khóa nội bộ, và dùng AI_REORDER_URL khi có", async () => {
+    const fetchMock = respond(200, { items: [] });
+    global.fetch = fetchMock as any;
+    await fetchReorderRanking(body, logger);
+    expect(fetchMock.mock.calls[0][1].headers["x-internal-key"]).toBe("secret-key");
+
+    process.env.AI_REORDER_URL = "http://reorder.test:8101";
+    await fetchReorderRanking(body, logger);
+    expect(fetchMock.mock.calls[1][0]).toBe("http://reorder.test:8101/api/v1/predict");
   });
 
   it("trả mã món theo thứ hạng của AI", async () => {

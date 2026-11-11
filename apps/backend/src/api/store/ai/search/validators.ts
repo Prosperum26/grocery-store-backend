@@ -7,6 +7,7 @@ export const AiSearchBody = z.object({
   servings: z.number().int().min(1).max(50).optional(),
   top_k: z.number().int().min(1).max(10).optional(),
   have: z.array(z.string().trim().min(1).max(100)).max(50).optional(),
+  include_basket: z.boolean().optional(),
 })
 
 export type AiSearchBodyType = z.infer<typeof AiSearchBody>
