@@ -99,7 +99,7 @@ Admin (`/admin/ai-settings`, `/admin/ai-stats` của AI service) chỉ được 
 | :--- | :--- |
 | Catalog v2 (2.129 sản phẩm) đã nạp vào Medusa, **SKU của variant = `catalog_id`**? | **Có.** Đối chiếu `data/recipe_rag/final/catalog_v2.json` của AI với `apps/backend/src/lib/seed/seed-data/catalog-v2.json`: cùng 2.129 `catalog_id`, không bên nào thiếu id |
 | Luồng cơ bản (sản phẩm, giỏ, đăng nhập, thanh toán thử) | Chạy được trên nhánh `feature/medusa-backend-integration`. VNPAY vẫn giả lập (chưa có sandbox thật) |
-| Giá và ảnh | **Mọi sản phẩm có giá** (giá ước tính bằng script của nhóm, `tools/catalog/build_catalog_v2.py`), 24 món có giá khuyến mãi. **Chưa sản phẩm nào có ảnh** (BE-2b hoãn) |
+| Giá và ảnh | **Mọi sản phẩm có giá** (giá ước tính bằng script của nhóm, `tools/catalog/build_catalog_v2.py`), 24 món có giá khuyến mãi. Ảnh (BE-2b bước 1): 1.746/2.129 sản phẩm có link ảnh; ảnh chỉ có trong DB của máy đã chạy `tools/catalog/fetch_images.py` và `npm run seed:images` (cách chạy: `tools/catalog/IMAGES.md`), 383 sản phẩm không có ảnh |
 | Sản phẩm chưa mở bán | 3 món đang ẩn (`draft`): CAT-000720, CAT-000929, CAT-001008 (combo mất trang và bản trùng, xem `tools/catalog/hidden-products.md`). **Không công thức nào trong `recipes_matched_v2.json` dùng 3 món này.** Món ẩn vẫn có biến thể và sku nhưng Store API không trả về: backend đánh dấu `purchasable: false` |
 | Quy ước backend | `grocery-store-backend/AGENTS.md`: logic trong workflow/module, route chỉ gọi workflow; dùng skill `medusa-dev` và MCP `medusa` |
 

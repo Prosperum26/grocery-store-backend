@@ -1,6 +1,7 @@
 import { ExecArgs } from "@medusajs/framework/types"
 import { bootstrapStore } from "../lib/seed/bootstrap-store"
 import { seedCatalog } from "../lib/seed/seed-catalog"
+import { attachCatalogImages } from "../lib/seed/upload-images"
 import { loadCatalogV2 } from "../lib/seed/seed-data/load-catalog-v2"
 import { seedDemo } from "../lib/seed/seed-demo"
 import { DEMO_DATA } from "../lib/seed/seed-data/demo"
@@ -17,8 +18,13 @@ export default async function seed({ container }: ExecArgs) {
   console.log("Publishable key:", store.publishableKey)
 
   // Catalog thật 2.129 món (BE-2). Test vẫn dùng bộ 32 món mặc định của seedCatalog.
-  const catalog = await seedCatalog(container, store, loadCatalogV2())
+  const catalogData = loadCatalogV2()
+  const catalog = await seedCatalog(container, store, catalogData)
   console.log(`Catalog: created ${catalog.created}, skipped ${catalog.skipped}`)
+
+  // Ảnh sản phẩm (BE-2b): ảnh đã tải bằng tools/catalog/fetch_images.py thì upload, không có file thì dùng link gốc.
+  const images = await attachCatalogImages(container, catalogData)
+  console.log(`Images: uploaded ${images.uploaded}, linked to original URL ${images.linked}, already had ${images.hadThumbnail}, no image ${images.missing}`)
 
   await seedPromotions(container, store)
   console.log("Promotions: TUOI20, THANHVIEN15, HETHAN5 (nhóm khách 'Thành viên')")
