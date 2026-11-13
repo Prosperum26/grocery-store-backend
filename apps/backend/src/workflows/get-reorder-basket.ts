@@ -3,6 +3,8 @@ import { createStep, createWorkflow, StepResponse, WorkflowResponse } from "@med
 import type { MedusaContainer } from "@medusajs/framework/types"
 import { availableOf, VARIANT_STOCK_FIELDS } from "../lib/inventory/available"
 import { fetchReorderRanking } from "../lib/predictive/ai-client"
+import { basketKey, cachedRanking, historyVersion } from "../lib/predictive/cache"
+import { reorderCachePrefix, reorderCacheRedis } from "../lib/predictive/redis"
 import {
   buildPredictRequest,
   hasReorderHistory,
@@ -113,10 +115,14 @@ export async function loadReorderData(container: MedusaContainer, customerId: st
     })
   const byId = new Map(purchased.map((item) => [item.variant_id, item]))
 
-  // 4. Model xếp hạng; bỏ món đã xoá hoặc đang ẩn.
-  const ranking = await fetchReorderRanking(
-    buildPredictRequest(delivered, categoryOf),
-    container.resolve(ContainerRegistrationKeys.LOGGER)
+  // 4. Model xếp hạng (giữ trong Redis 30 phút, xem lib/predictive/cache.ts); bỏ món đã xoá hoặc đang ẩn.
+  const logger = container.resolve(ContainerRegistrationKeys.LOGGER)
+  const { ranking } = await cachedRanking(
+    reorderCacheRedis(),
+    basketKey(reorderCachePrefix(), customerId),
+    historyVersion(delivered),
+    () => fetchReorderRanking(buildPredictRequest(delivered, categoryOf), logger),
+    (message) => logger.warn(message)
   )
   const ranked = ranking.flatMap((id) => byId.get(id) ?? [])
 
