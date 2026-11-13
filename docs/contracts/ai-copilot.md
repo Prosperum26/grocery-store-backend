@@ -76,6 +76,7 @@ Sai ràng buộc: `400` (kiểm ở `middlewares.ts`, test `integration-tests/ht
 | Trường | Ý nghĩa |
 | :--- | :--- |
 | `variant_id`, `product_id`, `handle` | Biến thể có `sku = catalog_id`; `handle` để mở trang sản phẩm |
+| `thumbnail` | Ảnh sản phẩm (hoặc `null`), để vẽ dải ảnh nguyên liệu ở thẻ gợi ý |
 | `title`, `unit_label` | Tên sản phẩm và tên biến thể trong Medusa (có thể khác `product.name` của AI) |
 | `unit_price` | VND, giá đang tính (gồm khuyến mãi), như API-1 |
 | `available` | Tồn đã trừ phần khách khác đang giữ, như API-15 |
@@ -99,3 +100,20 @@ Sai ràng buộc: `400` (kiểm ở `middlewares.ts`, test `integration-tests/ht
 | `400` | Body sai ràng buộc, thiếu publishable key |
 | `404 { code: "AI_RECIPE_NOT_FOUND" }` | `recipe` / `ask` với `recipe_id` không có |
 | `503 { code: "AI_UNAVAILABLE" }` | AI service không trả lời được và không có bản dự phòng. Storefront hiện "Trợ lý Bếp tạm nghỉ" **[cần nhóm AI xác nhận]** |
+
+## 5. Gợi ý món: `POST /store/ai/suggest/by-products`
+
+Cho khối "Mình thấy bạn có … trong giỏ" (B, `mode: "cart"`) và "Món nấu với sản phẩm này" (C, `mode: "product"`). Luật trên dữ liệu công thức, không có mô hình ngôn ngữ. Spec: `grocery-store-frontend/docs/plans/2026-11-11-recipe-suggestions-spec.md`. Không bắt đăng nhập.
+
+Request (`StoreAiSuggestByProductsRequest`):
+
+| Trường | Ghi chú |
+| :--- | :--- |
+| `catalog_ids` | 1–30 SKU: các biến thể trong giỏ (B), hoặc mọi biến thể của sản phẩm đang xem (C) |
+| `mode` | `"cart"` hoặc `"product"` |
+| `limit` | 1–3, mặc định 3 |
+| `exclude_ids` | Món đã hiện, bỏ khỏi kết quả |
+
+Response (`StoreAiSuggestResponse`): `{ status: "ready" | "empty", suggestions: StoreSuggestion[] }`. Mỗi `StoreSuggestion` gồm `recipe`, `matched` (sản phẩm đầu vào có trong món, `name` là tên nguyên liệu trong công thức), `missing_count`, `missing_total` (VND, tổng phần còn thiếu = đơn giá x `default_qty`) và `basket` (cùng dạng `/search`, có `variant`).
+
+Backend xin AI service 9 món, gắn biến thể và tồn, **bỏ món có dòng cần mua hết hàng hoặc chưa mở bán** rồi giữ `limit` món đầu. Không còn món nào thì `status: "empty"`. AI service lỗi: `503 AI_UNAVAILABLE`, storefront ẩn khối. Thời gian chờ: `AI_SUGGEST_TIMEOUT_MS` (mặc định 2000).

@@ -93,6 +93,10 @@ Backend (`/store/ai/search`, `/store/ai/copilot`) chuyển tiếp body, rồi **
 
 Admin (`/admin/ai-settings`, `/admin/ai-stats` của AI service) chỉ được gọi qua route admin của backend (đã xác thực admin Medusa), theo plan AI.
 
+### `POST /api/v1/suggest/by-products` và `POST /api/v1/suggest/discover`
+
+Gợi ý món bằng luật (không DB, không mô hình), chạy trong app Trợ lý Bếp. `by-products`: `{ catalog_ids (1–30), mode: "cart"|"product", limit (1–12), have, exclude_ids }`. `discover` (món thử mới): `{ bought_catalog_ids, have, seed, limit, exclude_ids }`. Trả `{ suggestions: [{ recipe, matched, new_count, familiar_count, missing_count, basket }] }`, mỗi họ món tối đa một món. Backend gọi `by-products` qua `/store/ai/suggest/by-products` (xem `ai-copilot.md`, mục 5).
+
 ## 6. Trả lời các câu hỏi nhóm AI đang chờ bên web (plan AI mục 6)
 
 | Câu hỏi | Trả lời (2026-11-06) |
