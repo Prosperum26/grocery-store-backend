@@ -1,8 +1,15 @@
 import { loadEnv, defineConfig } from '@medusajs/framework/utils'
+import { com4fudAdminBrand } from './admin-brand'
 
 loadEnv(process.env.NODE_ENV || 'development', process.cwd())
 
 module.exports = defineConfig({
+  // Admin: Com4Fud favicon and tab title (admin-brand.ts); page texts are in src/admin/i18n.
+  admin: {
+    // Medusa merges what this returns into its own Vite config, so only the extra plugin goes here
+    // (returning config.plugins too would load every plugin twice and break the admin).
+    vite: () => ({ plugins: [com4fudAdminBrand()] }),
+  },
   projectConfig: {
     databaseUrl: process.env.DATABASE_URL,
     http: {

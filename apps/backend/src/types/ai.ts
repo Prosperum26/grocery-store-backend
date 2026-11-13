@@ -172,6 +172,8 @@ export type AiAskResponse = {
   provider: string | null
   model: string | null
   latency_ms: number
+  dishes?: AiRecipeInfo[] // món gợi ý khi khách hỏi tìm món khác (tối đa 3, không gồm món đang xem)
+  product_query?: string | null // tên sản phẩm khi khách muốn tìm hoặc mua; storefront tự tìm bằng /store/search
 }
 
 // ---------------------------------------------------------------------------------------------------------
