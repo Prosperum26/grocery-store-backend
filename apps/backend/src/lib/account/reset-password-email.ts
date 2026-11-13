@@ -8,7 +8,7 @@ const escapeHtml = (s: string) =>
 /** Link về trang đặt mật khẩu của storefront. Token và email nằm trong query nên phải mã hóa. */
 export function buildResetUrl(storefrontUrl: string, email: string, token: string): string {
   const base = storefrontUrl.replace(/\/+$/, "")
-  return `${base}/vn/account/reset-password?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`
+  return `${base}/vn/reset-password?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`
 }
 
 export function buildResetPasswordEmail(resetUrl: string): ResetPasswordEmail {
