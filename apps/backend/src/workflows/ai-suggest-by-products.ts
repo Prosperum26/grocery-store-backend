@@ -17,7 +17,9 @@ const DEFAULT_KEEP = 3
 
 const askSuggestStep = createStep("ask-ai-suggest-by-products", async (input: { body: StoreAiSuggestByProductsRequest }) => {
   const { catalog_ids, mode, exclude_ids } = input.body
-  const data = await aiSuggestByProducts({ catalog_ids, mode, exclude_ids, limit: AI_POOL })
+  // `have`: sản phẩm đang xem hoặc đang trong giỏ coi như đã có, nên giỏ của món chỉ còn phần thiếu. Nếu không, chính các món
+  // trong giỏ (đang bị giữ tồn) làm món bị loại vì "hết hàng".
+  const data = await aiSuggestByProducts({ catalog_ids, mode, exclude_ids, limit: AI_POOL, have: catalog_ids })
   return new StepResponse<AiSuggestResponse>(data)
 })
 
