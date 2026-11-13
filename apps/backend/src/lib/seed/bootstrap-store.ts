@@ -69,7 +69,8 @@ export async function bootstrapStore(container: MedusaContainer): Promise<Bootst
     await updateStoresWorkflow(container).run({
       input: {
         selector: { id: stores[0].id },
-        update: { supported_currencies: supportedCurrencies, default_sales_channel_id: salesChannelId },
+        // Medusa tạo sẵn "Medusa Store" ở lần chạy đầu: đổi tên luôn, nếu không admin hiện tên đó ở thanh bên.
+        update: { name: "Com4Fud", supported_currencies: supportedCurrencies, default_sales_channel_id: salesChannelId },
       },
     })
   } else {
