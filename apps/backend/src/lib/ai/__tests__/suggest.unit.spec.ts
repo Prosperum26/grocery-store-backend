@@ -64,9 +64,12 @@ describe("shapeSuggestions", () => {
     expect(out).toEqual({ status: "empty", suggestions: [] })
   })
 
-  it("missing_total = tổng đơn giá x số lượng mặc định của phần còn thiếu", () => {
+  it("missing_total = tổng đơn giá x số gói như nút Thêm (pack_hint, không có thì default_qty)", () => {
     const out = shapeSuggestions({ suggestions: [DATA.suggestions[0]] }, infoOf(["CAT-1", 10000, 5], ["CAT-2", 5000, 5]), 3)
     expect(out.suggestions[0].missing_total).toBe(10000 * 1 + 5000 * 2)
+    const hinted = { ...item("CAT-1"), pack_hint: 3 }
+    const withHint = shapeSuggestions({ suggestions: [suggestion("h", [hinted])] }, infoOf(["CAT-1", 10000, 5]), 3)
+    expect(withHint.suggestions[0].missing_total).toBe(30000)
   })
 
   it("cắt còn `keep` món và gắn biến thể vào giỏ", () => {

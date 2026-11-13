@@ -1,6 +1,9 @@
 import type { AiSuggestResponse, StoreAiSuggestResponse, StoreSuggestion, StoreVariantInfo } from "../../types/ai"
 import { attachBasket, catalogIdsOfBaskets } from "./attach-variants"
 
+/** Số gói một dòng thêm vào giỏ: cùng quy tắc với packsOf() của storefront (lib/util/kitchen.ts). */
+const packsOf = (item: { pack_hint: number | null; default_qty: number }) => Math.max(1, Math.round(item.pack_hint ?? item.default_qty ?? 1))
+
 // Gắn phần bán hàng vào món gợi ý và bỏ món không mua được ngay. Hàm thuần, không đụng DB (như attach-variants.ts).
 
 /** Mọi catalog_id trong các giỏ của kết quả gợi ý, không trùng. */
@@ -10,7 +13,8 @@ export function catalogIdsOfSuggestions(data: AiSuggestResponse): string[] {
 
 /**
  * Giữ món mà MỌI dòng còn phải mua (`buy`) đều có biến thể đã mở bán và còn hàng; món khác bị loại, không hiện "hết hàng".
- * Giữ thứ tự của AI service, cắt còn `keep` món. `missing_total` = tổng giá phần còn thiếu (đơn giá x số lượng mặc định).
+ * Giữ thứ tự của AI service, cắt còn `keep` món. `missing_total` = tổng giá phần còn thiếu, tính số gói như nút "Thêm" của
+ * storefront (gợi ý `pack_hint`, không có thì `default_qty`, tối thiểu 1) để số tiền trên thẻ khớp với giỏ.
  * Không còn món nào thì `status: "empty"`.
  */
 export function shapeSuggestions(data: AiSuggestResponse, info: Map<string, StoreVariantInfo>, keep: number): StoreAiSuggestResponse {
@@ -20,7 +24,7 @@ export function shapeSuggestions(data: AiSuggestResponse, info: Map<string, Stor
     if (!basket.buy.every((item) => item.variant?.purchasable)) {
       continue
     }
-    const missing_total = basket.buy.reduce((sum, item) => sum + (item.variant?.unit_price ?? 0) * item.default_qty, 0)
+    const missing_total = basket.buy.reduce((sum, item) => sum + (item.variant?.unit_price ?? 0) * packsOf(item), 0)
     kept.push({ ...suggestion, basket, missing_total })
     if (kept.length === keep) {
       break
