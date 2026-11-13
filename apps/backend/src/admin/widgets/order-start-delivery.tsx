@@ -3,15 +3,11 @@ import type { AdminOrder, DetailWidgetProps } from "@medusajs/framework/types"
 import { Button, Container, Heading, Input, Label, Text, toast } from "@medusajs/ui"
 import { useState } from "react"
 
-type Delivery = { driver_name?: string; plate?: string; distance_km: number; eta_at: string }
-
-// "2026-10-27T10:09:00.000Z" -> "17:09" theo giờ VN, không phụ thuộc múi giờ của trình duyệt.
-const formatTime = (iso: string) =>
-  new Date(iso).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Ho_Chi_Minh" })
+type Delivery = { driver_name?: string; plate?: string }
 
 const OrderStartDeliveryWidget = ({ data: order }: DetailWidgetProps<AdminOrder>) => {
   const [loading, setLoading] = useState(false)
-  // Giữ kết quả vừa nhận từ POST để hiện ETA ngay, không cần tải lại trang.
+  // Giữ kết quả vừa nhận từ POST để hiện tài xế ngay, không cần tải lại trang.
   const [started, setStarted] = useState<Delivery | null>(null)
   const [driverName, setDriverName] = useState("")
   const [plate, setPlate] = useState("")
@@ -58,9 +54,6 @@ const OrderStartDeliveryWidget = ({ data: order }: DetailWidgetProps<AdminOrder>
               Tài xế {delivery.driver_name} · Biển số {delivery.plate}
             </Text>
           )}
-          <Text size="small">
-            Dự kiến tới lúc {formatTime(delivery.eta_at)} · còn {delivery.distance_km} km
-          </Text>
         </>
       ) : (
         <>
