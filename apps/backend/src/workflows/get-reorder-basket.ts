@@ -26,6 +26,7 @@ export type ReorderBasketItem = {
   unit_label: string // tên biến thể, ví dụ "Hộp 10 quả"
   art: string | null
   tint: string | null
+  thumbnail: string | null // ảnh sản phẩm; null thì storefront vẽ hình minh họa
   quantity: number
   unit_price: number // giá đang tính, gồm khuyến mãi
   in_stock: boolean // còn đủ `quantity` tại kho
@@ -76,6 +77,7 @@ export async function loadReorderData(container: MedusaContainer, customerId: st
       "product.handle",
       "product.title",
       "product.status",
+      "product.thumbnail",
       "product.metadata",
       "product.categories.handle",
       "calculated_price.calculated_amount",
@@ -103,6 +105,7 @@ export async function loadReorderData(container: MedusaContainer, customerId: st
         unit_label: v.title,
         art: v.product.metadata?.art ?? null,
         tint: v.product.metadata?.tint ?? null,
+        thumbnail: v.product.thumbnail ?? null,
         quantity,
         unit_price: Number(v.calculated_price?.calculated_amount ?? 0),
         in_stock: availableOf(v) >= quantity,

@@ -106,6 +106,7 @@ npm run backend:dev                       # http://localhost:9000, admin at /app
 ```
 
 - The first `backend:dev` on a new database activates the search index and loads every product into it, which takes a few minutes. Until then `/store/search` returns errors, and seeding logs many harmless `not_found` lines from search ingestion.
+- **After pulling a change to the search index** (`apps/backend/src/search/product.ts`, for example the `subcategory` field): run `npx medusa db:migrate:search` in `apps/backend` (or `npx medusa db:migrate`, which includes it), then restart the backend. A restart alone keeps serving the old index; the migration builds a new version (`product_v1 -> product_v2`), and the restart fills it. Until it is filled, `/store/search` keeps answering from the old version and asking for the new field (a facet on `subcategory`) returns 400.
 - Seeding prints the **publishable key**. Put it in `NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY` in the storefront's `.env.local` and restart the storefront. The key belongs to the database, so it changes whenever you recreate the database.
 - Admin user without demo data: `npx medusa user -e <email> -p <password>` in `apps/backend`.
 
