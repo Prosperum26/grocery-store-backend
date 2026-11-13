@@ -32,3 +32,9 @@ export function shapeSuggestions(data: AiSuggestResponse, info: Map<string, Stor
   }
   return { status: kept.length ? "ready" : "empty", suggestions: kept }
 }
+
+/** Ngày theo giờ Việt Nam (UTC+7), dạng 2026-11-13: đổi lúc nửa đêm giờ Việt Nam, không phải nửa đêm UTC. */
+export const vietnamDay = (now: Date): string => new Date(now.getTime() + 7 * 3600_000).toISOString().slice(0, 10)
+
+/** Hạt giống của A: cùng khách, cùng ngày thì thấy cùng món; khách chưa đăng nhập dùng chung "guest". */
+export const discoverSeed = (customerId: string | undefined, now: Date): string => `${customerId ?? "guest"}:${vietnamDay(now)}`

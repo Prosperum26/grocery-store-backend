@@ -230,3 +230,14 @@ export type StoreAiSuggestByProductsRequest = {
   limit?: number // 1–3
   exclude_ids?: string[]
 }
+
+// Thử món mới (A): POST /api/v1/suggest/discover. Storefront gọi POST /store/ai/suggest/discover.
+export type AiDiscoverRequest = {
+  bought_catalog_ids: string[] // sku trong các đơn đã giao của khách; rỗng = khách chưa có lịch sử
+  have: string[]
+  seed: string // khách + ngày: cùng khách cùng ngày thấy cùng món
+  limit?: number // 1–12
+  exclude_ids?: string[]
+}
+
+export type StoreAiDiscoverRequest = { exclude_ids?: string[]; have?: string[] }

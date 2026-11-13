@@ -1,7 +1,7 @@
 import { MedusaError } from "@medusajs/framework/utils"
 import type { AiBasketItem, AiSuggestResponse, AiSuggestion, StoreVariantInfo } from "../../../types/ai"
 import { AI_UNAVAILABLE, aiSuggestByProducts } from "../client"
-import { catalogIdsOfSuggestions, shapeSuggestions } from "../suggest"
+import { catalogIdsOfSuggestions, discoverSeed, shapeSuggestions, vietnamDay } from "../suggest"
 
 const item = (catalogId: string, qty = 1): AiBasketItem => ({
   ingredient: `nl ${catalogId}`,
@@ -109,5 +109,19 @@ describe("aiSuggestByProducts", () => {
       const error = await aiSuggestByProducts({ catalog_ids: ["CAT-1"], mode: "cart" }, impl).then(() => null, (e) => e)
       expect(MedusaError.isMedusaError(error) && error.code).toBe(AI_UNAVAILABLE)
     }
+  })
+})
+
+describe("discoverSeed", () => {
+  it("đổi ngày lúc nửa đêm giờ Việt Nam, không phải nửa đêm UTC", () => {
+    expect(vietnamDay(new Date("2026-11-13T16:59:00Z"))).toBe("2026-11-13") // 23:59 giờ VN
+    expect(vietnamDay(new Date("2026-11-13T17:00:00Z"))).toBe("2026-11-14") // 00:00 giờ VN
+  })
+
+  it("cùng khách cùng ngày cho cùng hạt giống; khách chưa đăng nhập dùng guest", () => {
+    const now = new Date("2026-11-13T05:00:00Z")
+    expect(discoverSeed("cus_1", now)).toBe("cus_1:2026-11-13")
+    expect(discoverSeed("cus_1", new Date("2026-11-13T09:00:00Z"))).toBe(discoverSeed("cus_1", now))
+    expect(discoverSeed(undefined, now)).toBe("guest:2026-11-13")
   })
 })

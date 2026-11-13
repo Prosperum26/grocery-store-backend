@@ -5,6 +5,7 @@ import type {
   AiCopilotResponse,
   AiRecipeDetail,
   AiRecipeRequest,
+  AiDiscoverRequest,
   AiSearchRequest,
   AiSearchResponse,
   AiSuggestByProductsRequest,
@@ -19,7 +20,7 @@ export const AI_UNAVAILABLE = "AI_UNAVAILABLE"
 /** Mã lỗi khi AI service báo không có món với recipe_id đó (404). Route đổi thành 404. */
 export const AI_RECIPE_NOT_FOUND = "AI_RECIPE_NOT_FOUND"
 
-type Endpoint = "search" | "copilot" | "recipe" | "ask" | "suggest/by-products"
+type Endpoint = "search" | "copilot" | "recipe" | "ask" | "suggest/by-products" | "suggest/discover"
 
 const TIMEOUT_ENV: Record<Endpoint, string> = {
   search: "AI_SEARCH_TIMEOUT_MS",
@@ -27,8 +28,9 @@ const TIMEOUT_ENV: Record<Endpoint, string> = {
   recipe: "AI_RECIPE_TIMEOUT_MS",
   ask: "AI_ASK_TIMEOUT_MS",
   "suggest/by-products": "AI_SUGGEST_TIMEOUT_MS",
+  "suggest/discover": "AI_SUGGEST_TIMEOUT_MS",
 }
-const TIMEOUT_DEFAULT_MS: Record<Endpoint, number> = { search: 3000, copilot: 35000, recipe: 3000, ask: 35000, "suggest/by-products": 2000 }
+const TIMEOUT_DEFAULT_MS: Record<Endpoint, number> = { search: 3000, copilot: 35000, recipe: 3000, ask: 35000, "suggest/by-products": 2000, "suggest/discover": 2000 }
 
 const unavailable = (message: string, cause?: unknown) => {
   const error = new MedusaError(MedusaError.Types.UNEXPECTED_STATE, message, AI_UNAVAILABLE)
@@ -135,6 +137,15 @@ export async function aiSuggestByProducts(body: AiSuggestByProductsRequest, fetc
   const data = await callAiService("suggest/by-products", body, fetchImpl)
   if (!Array.isArray((data as any)?.suggestions)) {
     throw unavailable("AI service suggest/by-products returned an unexpected body")
+  }
+  return data as AiSuggestResponse
+}
+
+/** /api/v1/suggest/discover: một món khách có thể muốn thử (A). Không có bản dự phòng. */
+export async function aiSuggestDiscover(body: AiDiscoverRequest, fetchImpl: typeof fetch = fetch): Promise<AiSuggestResponse> {
+  const data = await callAiService("suggest/discover", body, fetchImpl)
+  if (!Array.isArray((data as any)?.suggestions)) {
+    throw unavailable("AI service suggest/discover returned an unexpected body")
   }
   return data as AiSuggestResponse
 }
