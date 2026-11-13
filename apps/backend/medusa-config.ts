@@ -15,6 +15,33 @@ module.exports = defineConfig({
   },
   modules: [
     {
+      // Email (quên mật khẩu). Có SMTP_USER và SMTP_PASS thì gửi thật qua SMTP; không có thì provider local
+      // chỉ ghi nội dung email ra log, đủ để thử luồng khi chưa cấu hình hộp thư.
+      resolve: '@medusajs/medusa/notification',
+      options: {
+        providers: [
+          process.env.SMTP_USER && process.env.SMTP_PASS
+            ? {
+                resolve: './src/modules/smtp-notification',
+                id: 'smtp',
+                options: {
+                  channels: ['email'],
+                  host: process.env.SMTP_HOST || 'smtp.gmail.com',
+                  port: Number(process.env.SMTP_PORT || 465),
+                  user: process.env.SMTP_USER,
+                  pass: process.env.SMTP_PASS,
+                  from: process.env.SMTP_FROM || process.env.SMTP_USER,
+                },
+              }
+            : {
+                resolve: '@medusajs/medusa/notification-local',
+                id: 'local',
+                options: { name: 'Local email (log only)', channels: ['email'] },
+              },
+        ],
+      },
+    },
+    {
       // Provider id lưu trong DB là pp_{identifier}_{id} = pp_vnpay_vnpay.
       resolve: '@medusajs/medusa/payment',
       options: {
