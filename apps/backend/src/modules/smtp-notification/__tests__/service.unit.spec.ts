@@ -12,9 +12,9 @@ describe("SmtpNotificationProviderService", () => {
     createTransport.mockClear()
   })
 
-  it("requires every option", () => {
+  it("requires host, port and from", () => {
     expect(() => SmtpNotificationProviderService.validateOptions(options)).not.toThrow()
-    for (const key of Object.keys(options)) {
+    for (const key of ["host", "port", "from"]) {
       expect(() => SmtpNotificationProviderService.validateOptions({ ...options, [key]: "" })).toThrow(key)
     }
   })
@@ -42,6 +42,16 @@ describe("SmtpNotificationProviderService", () => {
       html: "<p>hi</p>",
       text: "hi",
     })
+  })
+
+  it("only logs the email when there is no SMTP account", async () => {
+    const info = jest.fn()
+    const service = new SmtpNotificationProviderService({ logger: { info } }, { ...options, user: undefined, pass: undefined })
+    expect(createTransport).not.toHaveBeenCalled()
+    const result = await service.send({ to: "khach@example.com", channel: "email", template: "", content: { subject: "S", text: "link: http://x" } })
+    expect(result).toEqual({ id: "logged-only" })
+    expect(sendMail).not.toHaveBeenCalled()
+    expect(info).toHaveBeenCalledWith(expect.stringContaining("link: http://x"))
   })
 
   it("refuses a notification without content", async () => {
