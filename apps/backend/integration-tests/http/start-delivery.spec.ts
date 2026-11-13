@@ -121,7 +121,7 @@ medusaIntegrationTestRunner({
         failShipment = false
       })
 
-      it("đơn PREPARING: 200, ghi metadata.delivery với ETA theo quận, stage sang SHIPPING", async () => {
+      it("đơn PREPARING: 200, ghi metadata.delivery (tài xế, giờ bắt đầu), stage sang SHIPPING", async () => {
         const { admin, placePreparingOrder, shippedAt } = await setup()
         const { orderId, fulfillmentId } = await placePreparingOrder("Quận 7")
 
@@ -133,10 +133,10 @@ medusaIntegrationTestRunner({
         const delivery = metadata.delivery
         expect(delivery.driver_name).toBe(DRIVER.driver_name)
         expect(delivery.plate).toBe(DRIVER.plate)
-        expect(delivery.distance_km).toBe(3)
-        expect(delivery.eta_at).toEqual(expect.any(String))
-        // Quận 7: 3 km / 20 km/h = 9 phút.
-        expect(new Date(delivery.eta_at).getTime() - new Date(delivery.started_at).getTime()).toBe(9 * 60 * 1000)
+        expect(delivery.started_at).toEqual(expect.any(String))
+        // Không còn ước tính giờ tới (spec R2, 2026-11-11).
+        expect(delivery.eta_at).toBeUndefined()
+        expect(delivery.distance_km).toBeUndefined()
         expect(delivery.notice_sent_at).toEqual(expect.any(String))
         expect(res.data.delivery).toEqual(delivery)
 
@@ -149,15 +149,6 @@ medusaIntegrationTestRunner({
         const again = await api.post(`/admin/orders/${orderId}/start-delivery`, DRIVER, admin).catch((e: any) => e.response)
         expect(again.status).toBe(409)
         expect((await orderMetadata(orderId)).delivery).toEqual(delivery)
-      })
-
-      it("quận không nhận ra dùng 6 km mặc định", async () => {
-        const { admin, placePreparingOrder } = await setup()
-        const { orderId } = await placePreparingOrder("Huyện Lạ")
-
-        const res = await api.post(`/admin/orders/${orderId}/start-delivery`, DRIVER, admin)
-        expect(res.status).toBe(200)
-        expect(res.data.delivery.distance_km).toBe(6)
       })
 
       it("đơn PENDING: 409 và metadata không đổi", async () => {
@@ -199,7 +190,7 @@ medusaIntegrationTestRunner({
         const { orderId, fulfillmentId } = await placePreparingOrder("Quận 7")
 
         // Đặt sẵn một giá trị delivery cũ: nếu bước ghi chạy rồi không được bù trừ thì giá trị này sẽ bị thay.
-        const previous = { distance_km: 1, eta_at: "2026-01-01T00:00:00.000Z" }
+        const previous = { driver_name: "Tài xế cũ", plate: "51-A1 000.00", started_at: "2026-01-01T00:00:00.000Z" }
         const current = await orderMetadata(orderId)
         await container
           .resolve(Modules.ORDER)
@@ -221,7 +212,7 @@ medusaIntegrationTestRunner({
         const retry = await api.post(`/admin/orders/${orderId}/start-delivery`, DRIVER, admin)
         expect(retry.status).toBe(200)
         await waitForStage(orderId, "SHIPPING")
-        expect((await orderMetadata(orderId)).delivery.distance_km).toBe(3)
+        expect((await orderMetadata(orderId)).delivery.driver_name).toBe(DRIVER.driver_name)
       })
     })
   },
