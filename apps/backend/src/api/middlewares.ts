@@ -11,6 +11,7 @@ import { SetDeliverySlotBody } from './store/carts/[id]/delivery-slot/validators
 import { AiAskBody } from './store/ai/ask/validators'
 import { AiRecipeBody } from './store/ai/recipe/validators'
 import { AiSearchBody } from './store/ai/search/validators'
+import { AiSuggestByProductsBody } from './store/ai/suggest/by-products/validators'
 import { StockQuery } from './store/stock/validators'
 
 // The product index declares filterable `status` and `sales_channel_ids`, so
@@ -87,6 +88,12 @@ export default defineMiddlewares({
       method: ['POST'],
       matcher: '/store/ai/ask',
       middlewares: [validateAndTransformBody(AiAskBody)],
+    },
+    // Gợi ý món từ giỏ hàng hoặc một sản phẩm (B, C): khách vãng lai cũng dùng được.
+    {
+      method: ['POST'],
+      matcher: '/store/ai/suggest/by-products',
+      middlewares: [validateAndTransformBody(AiSuggestByProductsBody)],
     },
     // Order retrieve omits `metadata` (the list route has it); needed for metadata.stage.
     // Risk: this route is unauthenticated, anyone holding the order UUID can read it.
