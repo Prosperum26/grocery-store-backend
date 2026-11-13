@@ -14,7 +14,7 @@ export default async function orderConfirmationEmail({ event: { data }, containe
       fields: [
         "id", "display_id", "created_at", "email", "metadata",
         "item_subtotal", "shipping_total", "discount_total", "total",
-        "items.product_title", "items.title", "items.variant_title", "items.quantity", "items.total",
+        "items.product_title", "items.title", "items.variant_title", "items.quantity", "items.detail.quantity", "items.total",
         "shipping_address.first_name", "shipping_address.last_name", "shipping_address.address_1",
         "shipping_address.address_2", "shipping_address.city",
       ],
@@ -36,7 +36,7 @@ export default async function orderConfirmationEmail({ event: { data }, containe
       items: (order.items ?? []).map((i: any) => ({
         title: i.product_title || i.title,
         variant: i.variant_title || null,
-        quantity: Number(i.quantity),
+        quantity: Number(i.detail?.quantity ?? i.quantity),
         total: Number(i.total),
       })),
       subtotal: Number(order.item_subtotal),

@@ -143,7 +143,7 @@ async function loadPopularItems(container: MedusaContainer, limit: number): Prom
   const since = new Date(Date.now() - POPULAR_DAYS * 24 * 3600 * 1000)
   const { data: orders } = await query.graph({
     entity: "order",
-    fields: ["id", "status", "items.variant_id", "items.quantity"],
+    fields: ["id", "status", "items.variant_id", "items.detail.quantity"],
     filters: { created_at: { $gte: since } },
   })
   const top = topSellingVariants(orders as any[])

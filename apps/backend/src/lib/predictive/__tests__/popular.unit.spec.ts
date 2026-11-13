@@ -22,6 +22,11 @@ describe("topSellingVariants", () => {
     expect(topSellingVariants(orders, 2)).toEqual(["a", "b"])
   })
 
+  it("reads the quantity from the order item detail", () => {
+    const orders = [{ status: "pending", items: [{ variant_id: "a", detail: { quantity: 3 } }, { variant_id: "b", detail: { quantity: 5 } }] }]
+    expect(topSellingVariants(orders)).toEqual(["b", "a"])
+  })
+
   it("is empty without orders", () => {
     expect(topSellingVariants([])).toEqual([])
   })
