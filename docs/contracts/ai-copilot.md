@@ -117,3 +117,10 @@ Request (`StoreAiSuggestByProductsRequest`):
 Response (`StoreAiSuggestResponse`): `{ status: "ready" | "empty", suggestions: StoreSuggestion[] }`. Mỗi `StoreSuggestion` gồm `recipe`, `matched` (sản phẩm đầu vào có trong món, `name` là tên nguyên liệu trong công thức), `missing_count`, `missing_total` (VND, tổng phần còn thiếu = đơn giá x `default_qty`) và `basket` (cùng dạng `/search`, có `variant`).
 
 Backend xin AI service 9 món, gắn biến thể và tồn, **bỏ món có dòng cần mua hết hàng hoặc chưa mở bán** rồi giữ `limit` món đầu. Không còn món nào thì `status: "empty"`. AI service lỗi: `503 AI_UNAVAILABLE`, storefront ẩn khối. Thời gian chờ: `AI_SUGGEST_TIMEOUT_MS` (mặc định 2000).
+
+## 6. Thử món mới: `POST /store/ai/suggest/discover`
+
+Cho khối "Thử món mới?" (A). Body `StoreAiDiscoverRequest`: `{ exclude_ids?: string[], have?: string[] }` (`have` = SKU trong giỏ hiện tại). Khách lấy từ phiên đăng nhập (không bắt buộc); backend đọc SKU trong các đơn đã giao của khách rồi hỏi AI service `/suggest/discover` với `seed = {customer_id | "guest"}:{ngày giờ Việt Nam}`, nên cùng khách cùng ngày thấy cùng món. Khách chưa đăng nhập hoặc chưa có đơn đã giao chỉ nhận món trong tập đã kiểm kỹ nhất.
+
+Trả `StoreAiSuggestResponse` như mục 5, nhưng chỉ một món (`suggestions.length <= 1`) và mỗi món có `new_count` (số nguyên liệu khách chưa từng mua) và `familiar_count` thay cho `matched`. "Đổi món khác": gọi lại với `exclude_ids` là các món đã hiện. Hết món thì `status: "empty"`. AI service lỗi: `503 AI_UNAVAILABLE`.
+
