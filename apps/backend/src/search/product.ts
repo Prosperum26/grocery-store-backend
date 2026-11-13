@@ -24,6 +24,7 @@ const PRODUCT_GRAPH_FIELDS = [
   "sales_channels.id",
   "categories.name",
   "tags.value",
+  "metadata",
   "options.title",
   "options.values.value",
 ];
@@ -40,6 +41,7 @@ type ProductRow = {
   sales_channels?: ({ id?: string | null } | null)[] | null;
   categories?: ({ name?: string | null } | null)[] | null;
   tags?: ({ value?: string | null } | null)[] | null;
+  metadata?: Record<string, unknown> | null;
   options?: ProductOptionRow[] | null;
 };
 
@@ -56,6 +58,9 @@ const productFields = search.define({
   created_at: search.date().sortable().retrievable(),
   category: search.keyword().array().filterable().facetable().retrievable(),
   labels: search.keyword().array().filterable().facetable().retrievable(),
+  // Nhóm nhỏ trong danh mục ("Rau lá", "Nước mắm"), lấy từ metadata.subcategory của seed.
+  // Storefront dùng làm bộ lọc "Loại" ở trang danh sách.
+  subcategory: search.keyword().filterable().facetable().retrievable(),
   option_values: search
     .keyword()
     .array()
@@ -86,6 +91,7 @@ function toDocument(
   const salesChannelIds = (product.sales_channels ?? [])
     .map((salesChannel) => salesChannel?.id?.trim())
     .filter((id): id is string => Boolean(id));
+  const subcategory = product.metadata?.subcategory;
 
   return {
     id: product.id,
@@ -98,6 +104,10 @@ function toDocument(
     created_at: product.created_at ?? null,
     category,
     labels,
+    subcategory:
+      typeof subcategory === "string" && subcategory.trim()
+        ? subcategory.trim()
+        : null,
     option_values: toOptionValues(product.options),
     in_stock: inStock(availability),
     ...toProductPricing(pricing),

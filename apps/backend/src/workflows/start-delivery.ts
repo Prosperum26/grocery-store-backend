@@ -12,23 +12,20 @@ import {
   releaseLockStep,
   useQueryGraphStep,
 } from "@medusajs/medusa/core-flows"
-import { estimateDelivery } from "../lib/delivery/estimate"
 
 export type StartDeliveryInput = { order_id: string; driver_name: string; plate: string }
 
-// Hình dạng `metadata.delivery` (API-7).
+// Hình dạng `metadata.delivery` (API-7). Không có giờ tới dự kiến: nhóm bỏ phần ước tính (2026-11-11).
+// Đơn giao trước đó có thể còn `distance_km`, `eta_at` trong metadata; không còn chỗ nào đọc hai khoá này.
 export type OrderDelivery = {
   driver_name: string
   plate: string
-  distance_km: number
-  eta_at: string
   started_at: string
   notice_sent_at: string
 }
 
 type OrderForDelivery = {
   metadata: Record<string, any> | null
-  shipping_address?: Record<string, any> | null
   fulfillments?: {
     id: string
     shipped_at?: string | null
@@ -37,7 +34,7 @@ type OrderForDelivery = {
   }[]
 }
 
-// Kiểm tra đơn được phép bắt đầu giao, chọn fulfillment cần giao rồi tính ETA. Chưa ghi gì.
+// Kiểm tra đơn được phép bắt đầu giao và chọn fulfillment cần giao. Chưa ghi gì.
 // Đơn không ở PREPARING hoặc không còn fulfillment nào chưa giao thì ném CONFLICT (409).
 type PlanDeliveryInput = { order: OrderForDelivery; driver_name: string; plate: string }
 
@@ -56,19 +53,10 @@ const planDeliveryStep = createStep("plan-delivery", async ({ order, driver_name
     throw new MedusaError(MedusaError.Types.CONFLICT, "Order has no unshipped fulfillment")
   }
 
-  // Quận có thể nằm ở bất kỳ ô nào của địa chỉ giao, nên ghép lại rồi để estimateDelivery tự tìm.
-  const address = order.shipping_address
-  const addressText = [address?.address_1, address?.address_2, address?.city, address?.province]
-    .filter(Boolean)
-    .join(", ")
-
   const startedAt = new Date()
-  const { distanceKm, etaAt } = estimateDelivery(addressText, startedAt)
   const delivery: OrderDelivery = {
     driver_name,
     plate,
-    distance_km: distanceKm,
-    eta_at: etaAt.toISOString(),
     started_at: startedAt.toISOString(),
     // O2: không gửi thông báo đẩy thật; ghi mốc này để storefront hiện băng thông báo khi khách mở đơn.
     notice_sent_at: startedAt.toISOString(),
@@ -117,7 +105,7 @@ const setDeliveryMetadataStep = createStep(
 )
 
 /**
- * Admin bấm "Bắt đầu giao" trên đơn PREPARING: ghi `metadata.delivery` (tài xế, biển số, ETA theo quận), rồi tạo shipment
+ * Admin bấm "Bắt đầu giao" trên đơn PREPARING: ghi `metadata.delivery` (tài xế, biển số, giờ bắt đầu), rồi tạo shipment
  * bằng workflow lõi của Medusa. `stage` sang SHIPPING do subscriber `shipment.created` (BE-6) đặt, không đặt ở đây.
  * Tạo shipment lỗi thì step ghi metadata được bù trừ, đơn trở lại như cũ.
  */
@@ -131,7 +119,6 @@ export const startDeliveryWorkflow = createWorkflow("start-delivery", (input: St
     fields: [
       "id",
       "metadata",
-      "shipping_address.*",
       "fulfillments.id",
       "fulfillments.shipped_at",
       "fulfillments.canceled_at",

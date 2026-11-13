@@ -103,7 +103,7 @@ medusaIntegrationTestRunner({
           admin
         )
         expect(start.status).toBe(200)
-        expect(start.data.delivery.distance_km).toBe(3)
+        expect(start.data.delivery.driver_name).toBe("Nguyễn Văn Đức")
       })
     })
   },
