@@ -124,3 +124,10 @@ Cho khối "Thử món mới?" (A). Body `StoreAiDiscoverRequest`: `{ exclude_id
 
 Trả `StoreAiSuggestResponse` như mục 5, nhưng chỉ một món (`suggestions.length <= 1`) và mỗi món có `new_count` (số nguyên liệu khách chưa từng mua) và `familiar_count` thay cho `matched`. "Đổi món khác": gọi lại với `exclude_ids` là các món đã hiện. Hết món thì `status: "empty"`. AI service lỗi: `503 AI_UNAVAILABLE`.
 
+## 7. Hỏi thêm có tìm món và tìm sản phẩm (`POST /store/ai/ask`)
+
+Phản hồi có thêm hai trường, backend chuyển nguyên từ AI service:
+
+- `dishes`: tối đa 3 món (`AiRecipeInfo`) khi khách muốn gợi ý món khác. Mô hình điền một cụm từ tìm món, AI service chạy đúng phần tìm món (từ khóa + bge-m3) của Trợ lý Bếp và bỏ món đang xem. Rỗng khi không hỏi, hoặc tìm không đủ gần.
+- `product_query`: tên sản phẩm khi khách muốn tìm hoặc mua. Storefront tự tìm bằng `/store/search` (cùng ô tìm kiếm trên header) và cho thêm nhanh vào giỏ. Mô hình không đụng tới giỏ hàng.
+
