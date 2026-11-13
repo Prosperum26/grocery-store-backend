@@ -7,6 +7,8 @@ import type {
   AiRecipeRequest,
   AiSearchRequest,
   AiSearchResponse,
+  AiSuggestByProductsRequest,
+  AiSuggestResponse,
 } from "../../types/ai"
 
 // Gọi AI service (docs/contracts/ai-service.md, mục 5). Chỉ làm việc mạng; gắn giá, tồn ở lib/ai/attach-variants.ts.
@@ -17,15 +19,16 @@ export const AI_UNAVAILABLE = "AI_UNAVAILABLE"
 /** Mã lỗi khi AI service báo không có món với recipe_id đó (404). Route đổi thành 404. */
 export const AI_RECIPE_NOT_FOUND = "AI_RECIPE_NOT_FOUND"
 
-type Endpoint = "search" | "copilot" | "recipe" | "ask"
+type Endpoint = "search" | "copilot" | "recipe" | "ask" | "suggest/by-products"
 
 const TIMEOUT_ENV: Record<Endpoint, string> = {
   search: "AI_SEARCH_TIMEOUT_MS",
   copilot: "AI_COPILOT_TIMEOUT_MS",
   recipe: "AI_RECIPE_TIMEOUT_MS",
   ask: "AI_ASK_TIMEOUT_MS",
+  "suggest/by-products": "AI_SUGGEST_TIMEOUT_MS",
 }
-const TIMEOUT_DEFAULT_MS: Record<Endpoint, number> = { search: 3000, copilot: 35000, recipe: 3000, ask: 35000 }
+const TIMEOUT_DEFAULT_MS: Record<Endpoint, number> = { search: 3000, copilot: 35000, recipe: 3000, ask: 35000, "suggest/by-products": 2000 }
 
 const unavailable = (message: string, cause?: unknown) => {
   const error = new MedusaError(MedusaError.Types.UNEXPECTED_STATE, message, AI_UNAVAILABLE)
@@ -125,4 +128,13 @@ export async function aiAsk(body: AiAskRequest, fetchImpl: typeof fetch = fetch)
     throw unavailable("AI service ask returned an unexpected body")
   }
   return data as AiAskResponse
+}
+
+/** /api/v1/suggest/by-products: món gợi ý từ các sản phẩm (giỏ hàng, trang sản phẩm). Luật trên dữ liệu có sẵn, không dự phòng. */
+export async function aiSuggestByProducts(body: AiSuggestByProductsRequest, fetchImpl: typeof fetch = fetch): Promise<AiSuggestResponse> {
+  const data = await callAiService("suggest/by-products", body, fetchImpl)
+  if (!Array.isArray((data as any)?.suggestions)) {
+    throw unavailable("AI service suggest/by-products returned an unexpected body")
+  }
+  return data as AiSuggestResponse
 }

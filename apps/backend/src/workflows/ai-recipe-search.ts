@@ -30,7 +30,7 @@ export const loadVariantRowsStep = createStep("load-ai-variant-rows", async (inp
   const query = container.resolve(ContainerRegistrationKeys.QUERY)
   const { data } = await query.graph({
     entity: "product_variant",
-    fields: ["id", "sku", "title", "product.id", "product.handle", "product.title", "product.status", "calculated_price.calculated_amount"],
+    fields: ["id", "sku", "title", "product.id", "product.handle", "product.title", "product.status", "product.thumbnail", "calculated_price.calculated_amount"],
     filters: { sku: input.skus },
     context: { calculated_price: QueryContext({ currency_code: "vnd" }) },
   })

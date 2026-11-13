@@ -109,6 +109,7 @@ export type StoreAiSearchRequest = AiSearchRequest
  * (không có hoặc sản phẩm đang ẩn); storefront khi đó hiện tên sản phẩm nhưng không cho thêm vào giỏ.
  */
 export type StoreVariantInfo = {
+  thumbnail: string | null // ảnh sản phẩm, để thẻ gợi ý vẽ dải ảnh nguyên liệu
   variant_id: string
   product_id: string
   handle: string // để mở trang sản phẩm
@@ -193,4 +194,39 @@ export type AiPredictResponse = {
   tau_applied: number | null
   low_history: boolean
   model_file: string
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// Gợi ý món (B giỏ hàng, C trang sản phẩm): POST /api/v1/suggest/by-products. Storefront gọi POST /store/ai/suggest/by-products.
+// Spec: grocery-store-frontend/docs/plans/2026-11-11-recipe-suggestions-spec.md
+// ---------------------------------------------------------------------------------------------------------
+
+export type AiSuggestByProductsRequest = {
+  catalog_ids: string[] // 1–30, sku của biến thể
+  mode: "cart" | "product"
+  limit?: number // 1–12
+  have?: string[]
+  exclude_ids?: string[]
+}
+
+export type AiSuggestion<Basket = AiBasket> = {
+  recipe: AiRecipeInfo
+  matched: { catalog_id: string; name: string }[] // sản phẩm đầu vào có trong món; name là tên nguyên liệu trong công thức
+  new_count: number | null // chỉ ở discover
+  familiar_count: number | null
+  missing_count: number
+  basket: Basket
+}
+
+export type AiSuggestResponse<Basket = AiBasket> = { suggestions: AiSuggestion<Basket>[] }
+
+export type StoreSuggestion = AiSuggestion<StoreBasket> & { missing_total: number } // VND, tổng phần còn thiếu (buy)
+
+export type StoreAiSuggestResponse = { status: "ready" | "empty"; suggestions: StoreSuggestion[] }
+
+export type StoreAiSuggestByProductsRequest = {
+  catalog_ids: string[]
+  mode: "cart" | "product"
+  limit?: number // 1–3
+  exclude_ids?: string[]
 }

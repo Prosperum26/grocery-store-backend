@@ -61,6 +61,7 @@ describe("buildVariantInfo", () => {
       variant_id: "v1",
       product_id: "prod_v1",
       handle: "h-CAT-1",
+      thumbnail: null,
       title: "Tên CAT-1",
       unit_label: "Vỉ 300g",
       unit_price: 59000,

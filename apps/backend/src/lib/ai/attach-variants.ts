@@ -34,7 +34,7 @@ export type VariantRow = {
   id: string
   sku: string
   title: string
-  product: { id: string; handle: string; title: string; status: string }
+  product: { id: string; handle: string; title: string; status: string; thumbnail?: string | null }
   calculated_price?: { calculated_amount?: number | null } | null
 }
 
@@ -57,6 +57,7 @@ export function buildVariantInfo(rows: VariantRow[], stockOf: StockOf): Map<stri
       variant_id: row.id,
       product_id: row.product.id,
       handle: row.product.handle,
+      thumbnail: row.product.thumbnail ?? null,
       title: row.product.title,
       unit_label: row.title,
       unit_price: Number(row.calculated_price?.calculated_amount ?? 0),
