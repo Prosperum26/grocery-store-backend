@@ -148,6 +148,8 @@ Cho đơn tạo bằng `completeCart`: `query.graph({ entity: "order_cart", fiel
 
 **Bằng chứng:** `src/modules/vnpay/__tests__/*.unit.spec.ts` (42 test), `integration-tests/http/vnpay-ipn.spec.ts` (11 test), `bootstrap-store.spec.ts`.
 
+**Cập nhật 2026-11-13 (trang return xác nhận như IPN):** chạy local không có tunnel thì IPN không bao giờ tới, khách đã trả tiền trên sandbox mà không có đơn (đã gặp thật: phiên `pp_vnpay_vnpay` kẹt ở `pending`, giỏ không hoàn tất). Logic IPN chuyển sang `src/lib/vnpay/handle-ipn.ts`; `GET /store/vnpay/verify-return` gọi cùng hàm khi chữ ký đúng và `returnConfirmsPayment()` bật (mặc định ngoài production, đặt bằng `VNPAY_RETURN_AS_IPN`). An toàn vì tham số return ký cùng khoá với IPN và `handleIpn` chạy lặp trả `02`. IPN vẫn là đường chính: trang return phụ thuộc trình duyệt khách. **Chưa kiểm** bằng test tích hợp (cần Postgres 5434 và `.env.test`).
+
 ## BE-5b — Mã giảm giá và ví mã
 
 **Kết quả đã chạy thật:**
