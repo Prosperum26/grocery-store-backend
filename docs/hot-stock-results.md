@@ -47,12 +47,58 @@ Ghi chú để đọc bảng (nhóm tự diễn giải trong báo cáo):
 - 100 request cùng lúc vào **một tiến trình Node** thì xếp hàng: 100 × khoảng 8 ms ≈ 800 ms. p95 ở đây chủ yếu là thời gian chờ, không phải thời gian xử lý. Muốn giảm thì chạy nhiều tiến trình (Medusa `server` và `worker`) và chuyển locking, event bus sang Redis (HS-9).
 - Proposal ghi mục tiêu `< 25 ms` cho route giữ hàng (`docs/02-architecture.md` ở thư mục gốc). Máy này đạt khi gọi lần lượt, không đạt khi 100 request cùng lúc vào một tiến trình. Cần nói rõ điều kiện đo khi so với mục tiêu.
 
+## Đo lại ngày 2026-11-14 (cho báo cáo mục 4.3)
+
+Cùng máy và cấu hình như mục "Môi trường" ở trên, code ở nhánh `dev` commit `c2a169a`. Mỗi phép đo chạy riêng, không chạy song song với phép đo khác.
+
+### Mức Redis (`bench-hot-stock.ts`)
+
+| Phép đo | n | p50 (ms) | p95 (ms) | p99 (ms) | max (ms) |
+| :--- | ---: | ---: | ---: | ---: | ---: |
+| Giữ hàng giỏ 1 món, gọi lần lượt | 5.000 | 0,559 | 0,787 | 0,951 | 4,319 |
+| Giữ hàng giỏ 3 món, gọi lần lượt | 5.000 | 0,581 | 0,810 | 0,983 | 2,931 |
+| Trả hàng | 5.000 | 0,584 | 0,814 | 0,994 | 6,017 |
+| `sync_item` | 5.000 | 0,269 | 0,421 | 0,516 | 1,765 |
+| Giữ hàng khi 100 yêu cầu tranh nhau (20 kết nối) | 2.000 | 4,098 | 6,685 | 11,152 | 12,735 |
+
+H4 mức Redis (N = 100, S0 = 5, 20 lượt): Lua 20/20 lượt đúng 5, bán lố 0, tồn thấp nhất 0. GET rồi DECRBY: 0/20 lượt đúng, bán 72–100 mỗi lượt, tổng bán lố 1.811, tồn thấp nhất −95.
+
+### Qua HTTP (`hot-stock-h4.spec.ts`)
+
+| Phép đo | n | p50 (ms) | p95 (ms) | p99 (ms) | max (ms) |
+| :--- | ---: | ---: | ---: | ---: | ---: |
+| API-14, gọi lần lượt | 100 | 13,3 | 16,5 | 18,4 | |
+| API-14, 100 request cùng lúc | 2.000 | 714,0 | 776,6 | 889,6 | 904,5 |
+
+H4 qua HTTP: 20/20 lượt đúng 5 giỏ `200`, 95 giỏ `409 OUT_OF_STOCK`, 0 lỗi khác, tồn thấp nhất 0. Vòng đầy đủ: 5 giỏ thắng, 3 trả tiền, 2 thanh toán lỗi, 2 giỏ khác giữ lại được, ra 5 đơn, Postgres `reserved = 5`, Redis `avail = 0`.
+
+### Cập nhật tồn thời gian thực (`apps/realtime-gateway`, `npm run bench`)
+
+Đường đi: Lua `reserve_hold` (chuỗi Lua đọc thẳng từ `lua/reserve-hold.ts`) → Redis Pub/Sub → gateway chạy **tiến trình riêng** (`src/index.ts`) → Socket.io → 100 client cùng xem một món, cùng máy. Đo từ lúc gửi lệnh Lua tới lúc client nhận `stock:update`. 20 vòng khởi động không tính, 200 vòng đo, chạy 3 lần.
+
+| Lần | Client đầu tiên p50 / p95 (ms) | Client cuối cùng (đủ 100) p50 / p95 / p99 / max (ms) |
+| :--- | :--- | :--- |
+| 1 | 0,630 / 0,880 | 1,678 / 2,076 / 2,215 / 2,547 |
+| 2 | 0,607 / 0,839 | 1,635 / 2,038 / 2,451 / 2,508 |
+| 3 | 0,618 / 0,822 | 1,665 / 2,048 / 2,296 / 2,517 |
+
+Không gồm độ trễ mạng internet và thời gian trình duyệt vẽ lại badge.
+
+### Kiểm thử tính đúng
+
+Tất cả đều pass: 34/34 test HTTP (`hot-stock-h4`, `hot-stock-ipn`, `hot-stock-lifecycle`, `hot-stock-reserve`, `hot-stock`), 31/31 test Lua mức module (`src/modules/hot-stock/__tests__/hold.spec.ts`), 5/5 test gateway.
+
 ## Cách chạy lại
 
 ```bash
 cd apps/backend
 # H4 qua HTTP (cần Postgres và Redis); in các dòng bắt đầu bằng "H4"
 npx cross-env TEST_TYPE=integration:http NODE_OPTIONS=--experimental-vm-modules jest --silent=false --runInBand --forceExit -- integration-tests/http/hot-stock-h4.spec.ts
-# Mức Redis và so sánh GET + DECRBY; dùng key "c4f-bench:", không đụng dữ liệu cửa hàng
-npx medusa exec ./src/scripts/bench-hot-stock.ts
+# Mức Redis và so sánh GET + DECRBY; dùng key "c4f-bench:", không đụng dữ liệu cửa hàng.
+# MEDUSA_WORKER_MODE=server để `medusa exec` không nạp job (job trả hold sẽ chạy trên dữ liệu thật).
+MEDUSA_WORKER_MODE=server npx medusa exec ./src/scripts/bench-hot-stock.ts
+
+cd ../realtime-gateway
+# Cập nhật tồn thời gian thực; dùng key "c4f-bench-rt:<pid>:" và xoá khi xong. Tuỳ chọn: CLIENTS, WARMUP, ROUNDS, BENCH_PORT
+npm run bench
 ```
