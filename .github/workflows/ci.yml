@@ -1,0 +1,55 @@
+# CI cho backend Medusa và realtime-gateway.
+# - test đơn vị của apps/backend (không cần DB/Redis)
+# - test của realtime-gateway (cần Redis thật: dùng service container)
+# - build thử Medusa (medusa build: server + admin)
+# Test tích hợp (Postgres + Redis) chưa đưa vào CI, chạy tay theo README.
+# CD: Render tự deploy khi có push lên main (render.yaml). Xem docs/deploy.md.
+name: CI
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+    branches: [dev, main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      redis:
+        image: redis:7.2-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      REDIS_URL: redis://localhost:6379
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint (medusa lint, chỉ chặn khi có error)
+        run: npm run lint -w @dtc/backend
+
+      - name: Unit tests (apps/backend)
+        run: npm run test:unit -w @dtc/backend
+
+      - name: Gateway tests (apps/realtime-gateway, Redis thật)
+        run: npm test -w @dtc/realtime-gateway
+
+      - name: Build Medusa
+        run: npm run build -w @dtc/backend

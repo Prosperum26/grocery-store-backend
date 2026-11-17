@@ -9,6 +9,8 @@ module.exports = defineConfig({
     // Medusa merges what this returns into its own Vite config, so only the extra plugin goes here
     // (returning config.plugins too would load every plugin twice and break the admin).
     vite: () => ({ plugins: [com4fudAdminBrand()] }),
+    // Khi deploy (Render), admin là trang tĩnh gọi API qua URL này. Local để trống thì dùng "/" như mặc định.
+    backendUrl: process.env.MEDUSA_BACKEND_URL || '/',
   },
   projectConfig: {
     databaseUrl: process.env.DATABASE_URL,
