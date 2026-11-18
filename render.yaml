@@ -1,0 +1,102 @@
+# Render Blueprint (gói free): Medusa backend + realtime-gateway + Redis (Render Key Value).
+# Tạo trên Render: New > Blueprint > chọn repo này. Biến có `sync: false` sẽ được hỏi lúc tạo.
+# Postgres dùng Neon (free, không hết hạn sau 30 ngày như Render Postgres free). Xem docs/deploy.md.
+services:
+  # Medusa v2 (server + admin tại /app). Build ra apps/backend/.medusa/server rồi chạy từ đó.
+  - type: web
+    name: com4fud-backend
+    runtime: node
+    plan: free
+    region: singapore
+    branch: main
+    buildCommand: >-
+      npm ci &&
+      npm run build -w @dtc/backend &&
+      cd apps/backend/.medusa/server && npm install --omit=dev
+    # Gói free không có pre-deploy command nên chạy migrate ngay trước khi start.
+    startCommand: cd apps/backend/.medusa/server && npx medusa db:migrate && npx medusa start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      # Instance free chỉ có 512 MB RAM.
+      - key: NODE_OPTIONS
+        value: --max-old-space-size=460
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: com4fud-redis
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: COOKIE_SECRET
+        generateValue: true
+      # URL của chính service này, ví dụ https://com4fud-backend.onrender.com
+      - key: MEDUSA_BACKEND_URL
+        sync: false
+      # URL storefront trên Vercel, ví dụ https://com4fud.vercel.app
+      - key: STORE_CORS
+        sync: false
+      # = MEDUSA_BACKEND_URL
+      - key: ADMIN_CORS
+        sync: false
+      # MEDUSA_BACKEND_URL,STORE_CORS (cách nhau bằng dấu phẩy)
+      - key: AUTH_CORS
+        sync: false
+      - key: STOREFRONT_URL
+        sync: false
+      - key: VNPAY_TMN_CODE
+        sync: false
+      - key: VNPAY_HASH_SECRET
+        sync: false
+      # https://<storefront>/vn/checkout/vnpay-return
+      - key: VNPAY_RETURN_URL
+        sync: false
+      # Chưa đăng ký IPN với VNPAY sandbox thì để true: trang return xác nhận thanh toán thay IPN.
+      - key: VNPAY_RETURN_AS_IPN
+        value: "true"
+      # URL Hugging Face Space của grocery-store-ai, ví dụ https://<user>-com4fud-ai.hf.space
+      - key: AI_SERVICE_URL
+        sync: false
+      - key: AI_INTERNAL_KEY
+        sync: false
+      # AI chạy trên CPU free nên nới thời gian chờ tìm món.
+      - key: AI_SEARCH_TIMEOUT_MS
+        value: "8000"
+
+  # Socket.io gateway: chuyển sự kiện tồn kho từ Redis Pub/Sub tới storefront.
+  - type: web
+    name: com4fud-realtime
+    runtime: node
+    plan: free
+    region: singapore
+    branch: main
+    buildCommand: npm ci
+    startCommand: npm run start -w @dtc/realtime-gateway
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # Render gửi traffic vào PORT (mặc định 10000); gateway đọc REALTIME_PORT.
+      - key: REALTIME_PORT
+        value: "10000"
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: com4fud-redis
+          property: connectionString
+      - key: STORE_CORS
+        sync: false
+
+  # Redis cho hot-stock (Lua), cache "Mua lại" và Pub/Sub. Gói free: 25 MB, không lưu xuống đĩa.
+  - type: keyvalue
+    name: com4fud-redis
+    plan: free
+    region: singapore
+    maxmemoryPolicy: noeviction
+    ipAllowList: []

@@ -24,3 +24,8 @@ build
 !.yarn/versions
 
 .medusa
+.env.test
+/static
+
+# Ảnh sản phẩm tải bằng tools/catalog/fetch_images.py (đặt sau !src/** thì mới có hiệu lực)
+src/lib/seed/seed-data/images/
